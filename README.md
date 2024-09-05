@@ -77,7 +77,7 @@ export TF_VAR_access_key=$ACCESS_KEY_ID
 export TF_VAR_secret_key=$SECRET_ACCESS_KEY
 ```
 
-2. Подготавливаем backet:
+2. Подготавливаем bucket:
 
 ```
 resource "yandex_storage_bucket" "my_bucket" {
@@ -89,7 +89,7 @@ resource "yandex_storage_bucket" "my_bucket" {
 }
 ```
 
-3. Размещаем backend для Terraform в заранее подготовленный backet:
+3. Размещаем backend для Terraform в заранее подготовленный bucket:
 
 ```
 terraform {
