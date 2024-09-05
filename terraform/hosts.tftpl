@@ -1,0 +1,37 @@
+---
+all:
+  vars:
+    ansible_ssh_user: ubuntu
+    become: true
+
+  hosts:
+    %{~ for i in masters ~}
+    ${i["name"]}:
+      ansible_host: ${i["network_interface"][0]["nat_ip_address"] == "" ? i["network_interface"][0]["ip_address"] : i["network_interface"][0]["nat_ip_address"]}
+    %{~ endfor ~}
+    %{~ for i in workers ~}
+    ${i["name"]}:
+      ansible_host: ${i["network_interface"][0]["nat_ip_address"] == "" ? i["network_interface"][0]["ip_address"] : i["network_interface"][0]["nat_ip_address"]}
+    %{~ endfor ~}
+  children:
+    kube_control_plane:
+      hosts:
+      %{~ for i in masters ~}
+        ${i["name"]}:
+      %{~ endfor ~}
+    kube_node:
+      hosts:
+      %{~ for i in workers ~}
+        ${i["name"]}:
+      %{~ endfor ~}
+    etcd:
+      hosts:
+      %{~ for i in masters ~}
+        ${i["name"]}:
+      %{~ endfor ~}
+    k8s_cluster:
+      children:
+        kube_control_plane:
+        kube_node:
+    calico_rr:
+      hosts: {}

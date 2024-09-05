@@ -13,7 +13,7 @@ yc iam key create --service-account-id $ID_SA --format json --output ~/.ssh/sa-i
 ACCESS_KEY_ID=$(grep 'key_id' ~/.ssh/sa-key.json | awk '{print $2}' | tr -d \")
 SECRET_ACCESS_KEY=$(grep 'secret' ~/.ssh/sa-key.json | awk '{print $2}' | tr -d \")
 
-# Установите переменные окружения
+# Устанавливаем переменные окружения
 export AWS_ACCESS_KEY_ID=$ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY=$SECRET_ACCESS_KEY
 export TF_VAR_access_key=$ACCESS_KEY_ID

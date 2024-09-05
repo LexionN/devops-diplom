@@ -26,12 +26,6 @@ variable "default_zone" {
 
 variable "public_cidr" {
   type        = list(string)
-  default     = ["192.168.10.0/24", "192.168.20.0/24", "192.168.30.0/24"]
-  description = "https://cloud.yandex.ru/docs/vpc/operations/subnet-create"
-}
-
-variable "private_cidr" {
-  type        = list(string)
   default     = ["10.0.10.0/24", "10.0.20.0/24", "10.0.30.0/24"]
   description = "https://cloud.yandex.ru/docs/vpc/operations/subnet-create"
 }
@@ -41,15 +35,6 @@ variable "vpc_name" {
   default     = "netology-network"
   description = "VPC network name"
 }
-
-
-#Variables VM WEB
-variable "vm_web_family" {
-  type        = string
-  default     = "ubuntu-2004-lts"
-  description = "Yandex compute image family"
-}
-
 
 variable "vms_resources" {
   type = map(object({
@@ -61,7 +46,11 @@ variable "vms_resources" {
   description = "VM Resourses"
 }
 
-
+variable "platform_id" {
+  type        = string
+  default     = "standard-v3"
+  description = "Platform vCPU"
+}
 
 variable "metadata_vm" {
   type = map(object({

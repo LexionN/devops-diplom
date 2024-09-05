@@ -1,0 +1,60 @@
+---
+- name: Prepare and install K8S
+  hosts: kube_control_plane
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Validating the ssh port is open and
+      local_action:
+        module: wait_for
+          host="{{ansible_host}}"
+          port=22
+          delay=10
+      become: false
+
+  tasks:
+    - name: Packages-update
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install packages
+      ansible.builtin.apt:
+        name:
+          - git
+          - python3-pip
+        state: present
+
+    - name: Clone kubespray repo
+      ansible.builtin.git:
+        repo: https://github.com/kubernetes-sigs/kubespray.git
+        dest: ~/kubespray
+
+    - name: Install requirements
+      ansible.builtin.pip:
+        requirements: ~/kubespray/requirements.txt
+
+    - name: Copy SSH-key to master
+      ansible.builtin.copy:
+        src: "~/.ssh/id_rsa"
+        dest: "~/.ssh/id_rsa"
+        mode: '0600'
+        owner: root
+        group: root
+
+
+    - name: Copy inventory to master
+      ansible.builtin.copy:
+        src: "../ansible/hosts.yml"
+        dest: "~/kubespray/inventory/"
+
+    - name: Install K8S
+      ansible.builtin.command: "ansible-playbook -i ./inventory/hosts.yml -b cluster.yml" 
+      args:
+        chdir: ~/kubespray
+
+      register: install_k8s
+
+    - name: Print output install-k8s
+      ansible.builtin.debug: 
+        msg: "{{ install_k8s.stdout }}"

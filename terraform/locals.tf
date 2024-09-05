@@ -7,5 +7,6 @@ locals {
       "ru-central1-b",
       "ru-central1-d"
     ])
+    ssh-private = "~/.ssh/id_rsa"
  
 }
