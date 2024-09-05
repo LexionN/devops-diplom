@@ -50,6 +50,170 @@
 1. Terraform сконфигурирован и создание инфраструктуры посредством Terraform возможно без дополнительных ручных действий.
 2. Полученная конфигурация инфраструктуры является предварительной, поэтому в ходе дальнейшего выполнения задания возможны изменения.
 
+### Выполнение:
+
+1. Создадим сервисный аккаунт, который будет в дальнейшем использоваться Terraform для работы с инфраструктурой с необходимыми и достаточными правами. Для упрощения напишем скрипт:
+
+```
+#!/bin/sh
+
+# Подготавливаем SA
+yc iam service-account delete sa-robot
+yc iam service-account create --name sa-robot
+ID_SA=`yc iam service-account list | grep 'sa-robot' | awk '{print $2}'`
+yc resource-manager folder add-access-binding --id b1gnc2bkas267cooida6 --role editor --service-account-id $ID_SA
+yc resource-manager folder add-access-binding --id b1gnc2bkas267cooida6 --role storage.admin --service-account-id $ID_SA
+yc iam access-key create --service-account-id $ID_SA --format json > ~/.ssh/sa-key.json
+yc iam key create --service-account-id $ID_SA --format json --output ~/.ssh/sa-iam.json
+
+# Извлекаем access_key и secret_key
+ACCESS_KEY_ID=$(grep 'key_id' ~/.ssh/sa-key.json | awk '{print $2}' | tr -d \")
+SECRET_ACCESS_KEY=$(grep 'secret' ~/.ssh/sa-key.json | awk '{print $2}' | tr -d \")
+
+# Устанавливаем переменные окружения
+export AWS_ACCESS_KEY_ID=$ACCESS_KEY_ID
+export AWS_SECRET_ACCESS_KEY=$SECRET_ACCESS_KEY
+export TF_VAR_access_key=$ACCESS_KEY_ID
+export TF_VAR_secret_key=$SECRET_ACCESS_KEY
+```
+
+2. Подготавливаем bucket:
+
+```
+resource "yandex_storage_bucket" "my_bucket" {
+  access_key = var.access_key
+  secret_key = var.secret_key
+  bucket                = "aleksey-naumov"
+  default_storage_class = "STANDARD"
+  acl    = "private"
+}
+```
+
+3. Размещаем backend для Terraform в заранее подготовленный bucket:
+
+```
+terraform {
+  backend "s3" {
+    endpoints = {
+      s3 = "https://storage.yandexcloud.net"
+    }
+    
+    bucket = "aleksey-naumov"
+    region = "ru-central1"
+    key    = "terraform.tfstate"
+   
+    skip_region_validation      = true
+    skip_credentials_validation = true
+    skip_requesting_account_id  = true # Необходимая опция Terraform для версии 1.6.1 и старше.
+    skip_s3_checksum            = true # Необходимая опция при описании бэкенда для Terraform версии 1.6.3 и старше.
+    skip_metadata_api_check     = true
+
+  }
+}
+```
+
+4. Создадим VPC с подсетями в разных зонах доступности. Для этого используем локальные переменные:
+
+```
+locals {
+    vpc_zone = tolist ([
+      "ru-central1-a", 
+      "ru-central1-b",
+      "ru-central1-d"
+    ])
+}
+```
+
+Создаем ресурсы:
+
+```
+resource "yandex_vpc_network" "network_vpc" {
+  name = var.vpc_name
+}
+
+resource "yandex_vpc_subnet" "public_subnet" {
+  count          = length(local.vpc_zone)
+  name           = "public_${local.vpc_zone[count.index]}"
+  zone           = local.vpc_zone[count.index]
+  network_id     = yandex_vpc_network.network_vpc.id
+  v4_cidr_blocks = [var.public_cidr[count.index]]
+}
+```
+
+5. Убедимся, что теперь можно выполнить команды `terraform destroy` и `terraform apply` без дополнительных ручных действий.
+
+```
+$ terraform apply
+
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+--------------------ВЫВОД ПРОПУЩЕН------------------------
+
+Plan: 4 to add, 0 to change, 0 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+yandex_vpc_network.network_vpc: Creating...
+yandex_vpc_network.network_vpc: Creation complete after 3s [id=enp2fc69ab7gtjmfq7mb]
+yandex_vpc_subnet.public_subnet[2]: Creating...
+yandex_vpc_subnet.public_subnet[1]: Creating...
+yandex_vpc_subnet.public_subnet[0]: Creating...
+yandex_vpc_subnet.public_subnet[1]: Creation complete after 0s [id=e2ljegbh6m99n850vsqq]
+yandex_vpc_subnet.public_subnet[0]: Creation complete after 1s [id=e9b742nucqphhs5f5lqi]
+yandex_vpc_subnet.public_subnet[2]: Creation complete after 1s [id=fl8ab1frul3bcgeeu002]
+
+Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
+```
+
+```
+$ terraform destroy
+yandex_vpc_network.network_vpc: Refreshing state... [id=enpur45aeas52aba40k6]
+yandex_vpc_subnet.public_subnet[2]: Refreshing state... [id=fl85k23rgc7afserkdus]
+yandex_vpc_subnet.public_subnet[1]: Refreshing state... [id=e2lljtr90obi885n25e3]
+yandex_vpc_subnet.public_subnet[0]: Refreshing state... [id=e9b87s9g3k6cetf06p6e]
+
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+--------------------ВЫВОД ПРОПУЩЕН------------------------
+
+Plan: 0 to add, 0 to change, 4 to destroy.
+
+Do you really want to destroy all resources?
+  Terraform will destroy all your managed infrastructure, as shown above.
+  There is no undo. Only 'yes' will be accepted to confirm.
+
+  Enter a value: yes
+
+yandex_vpc_subnet.public_subnet[1]: Destroying... [id=e2lljtr90obi885n25e3]
+yandex_vpc_subnet.public_subnet[2]: Destroying... [id=fl85k23rgc7afserkdus]
+yandex_vpc_subnet.public_subnet[0]: Destroying... [id=e9b87s9g3k6cetf06p6e]
+yandex_vpc_subnet.public_subnet[0]: Destruction complete after 1s
+yandex_vpc_subnet.public_subnet[2]: Destruction complete after 2s
+yandex_vpc_subnet.public_subnet[1]: Destruction complete after 3s
+yandex_vpc_network.network_vpc: Destroying... [id=enpur45aeas52aba40k6]
+yandex_vpc_network.network_vpc: Destruction complete after 0s
+
+Destroy complete! Resources: 4 destroyed.
+```
+
+Подтвердим скриншотами созданные ресурсы:
+
+![image](https://github.com/user-attachments/assets/d354fc16-fb01-43af-81a0-e7d15f1a6915)
+
+![image](https://github.com/user-attachments/assets/eabe13fe-9998-4dea-b837-72f89b5a56a2)
+
+
+
 ---
 ### Создание Kubernetes кластера
 
