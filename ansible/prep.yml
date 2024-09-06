@@ -48,13 +48,13 @@
         src: "../ansible/hosts.yml"
         dest: "~/kubespray/inventory/"
 
-    - name: Install K8S
-      ansible.builtin.command: "ansible-playbook -i ./inventory/hosts.yml -b cluster.yml" 
-      args:
-        chdir: ~/kubespray
+    # - name: Install K8S
+    #   ansible.builtin.command: "ansible-playbook -i ./inventory/hosts.yml -b cluster.yml" 
+    #   args:
+    #     chdir: ~/kubespray
 
-      register: install_k8s
+    #   register: install_k8s
 
-    - name: Print output install-k8s
-      ansible.builtin.debug: 
-        msg: "{{ install_k8s.stdout }}"
+    # - name: Print output install-k8s
+    #   ansible.builtin.debug: 
+    #     msg: "{{ install_k8s.stdout }}"
