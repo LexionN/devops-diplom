@@ -76,3 +76,9 @@ variable "secret_key" {
   description = "Secret key for Yandex Cloud Storage"
   default     = ""  # Можно оставить пустым
 }
+
+variable "account_id" {
+  description = "Service account ID"
+  default     = ""  # Можно оставить пустым
+}
+
