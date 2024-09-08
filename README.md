@@ -235,6 +235,293 @@ Destroy complete! Resources: 4 destroyed.
 2. В файле `~/.kube/config` находятся данные для доступа к кластеру.
 3. Команда `kubectl get pods --all-namespaces` отрабатывает без ошибок.
 
+
+### Выполнение
+
+1. Для выполнения задания нам понадобится 3 рабочих ноды, расположенные в разных подсетях:
+
+```
+resource "yandex_compute_instance" "workers" {
+  count = length(local.vpc_zone)
+  name  = "worker-${count.index+1}"
+  hostname = "worker-${count.index+1}"
+  zone     = local.vpc_zone[count.index]
+   resources {
+   cores=var.vms_resources.workers_vm.cores
+   memory=var.vms_resources.workers_vm.memory
+   core_fraction=var.vms_resources.workers_vm.core_fraction
+  }
+  platform_id = var.platform_id
+  boot_disk {
+    initialize_params {
+      image_id = "fd8j0uq7qcvtb65fbffl"
+      size     = 15
+    }
+  }
+  scheduling_policy {
+    preemptible = true
+  }
+
+  network_interface {
+    subnet_id = yandex_vpc_subnet.public_subnet[count.index].id
+    nat       = true
+  }
+  metadata = local.metadata_vm
+}
+```
+
+2. Также понадобится как минимум 1 мастер нода:
+
+```
+resource "yandex_compute_instance" "masters" {
+  name  = "master-1"
+  hostname = "master-1"
+  zone     = local.vpc_zone[0]
+   resources {
+   cores=var.vms_resources.masters_vm.cores
+   memory=var.vms_resources.masters_vm.memory
+   core_fraction=var.vms_resources.masters_vm.core_fraction
+  }
+  platform_id = var.platform_id
+  boot_disk {
+    initialize_params {
+      image_id = "fd8j0uq7qcvtb65fbffl"
+      size     = 15
+    }
+  }
+  scheduling_policy {
+    preemptible = true
+  }
+
+  network_interface {
+    subnet_id = yandex_vpc_subnet.public_subnet[0].id
+    nat       = true
+    
+  }
+  metadata = local.metadata_vm
+}
+```
+
+3. Для разворачивания кластера с помощью Kubespray склонируем репозиторий командой ```$ git clone https://github.com/kubernetes-sigs/kubespray.git```
+4. Для подготовки inventory, воспользуемся шаблоном terraform:
+
+```
+---
+all:
+  vars:
+    ansible_ssh_user: ubuntu
+    become: true
+
+  hosts:
+    %{~ for i in masters ~}
+    ${i["name"]}:
+      ansible_host: ${i["network_interface"][0]["nat_ip_address"] == "" ? i["network_interface"][0]["ip_address"] : i["network_interface"][0]["nat_ip_address"]}
+    %{~ endfor ~}
+    %{~ for i in workers ~}
+    ${i["name"]}:
+      ansible_host: ${i["network_interface"][0]["nat_ip_address"] == "" ? i["network_interface"][0]["ip_address"] : i["network_interface"][0]["nat_ip_address"]}
+    %{~ endfor ~}
+  children:
+    kube_control_plane:
+      hosts:
+      %{~ for i in masters ~}
+        ${i["name"]}:
+      %{~ endfor ~}
+    kube_node:
+      hosts:
+      %{~ for i in workers ~}
+        ${i["name"]}:
+      %{~ endfor ~}
+    etcd:
+      hosts:
+      %{~ for i in masters ~}
+        ${i["name"]}:
+      %{~ endfor ~}
+    k8s_cluster:
+      children:
+        kube_control_plane:
+        kube_node:
+    calico_rr:
+      hosts: {}
+
+```
+
+5. В последних версиях Kubespray при запуске playbook из сторонней директории возникает ошибка ``` ERROR! the role 'kubespray-defaults' was not found ```. Чтобы избежать появления ошибки, сфоррмируем конфигурацию ansible.cfg и расположим её в папке с кодом terraform:
+
+```
+[defaults]
+library = ..ansible/kubespray/library
+roles_path = ../ansible/kubespray/roles
+```
+
+6. Подготовим переменные для указания характеристик создаваемых инстансов:
+
+```
+vms_resources = {
+  workers_vm = { cores=2, memory=4, core_fraction=50 }
+  masters_vm = { cores=2, memory=4, core_fraction=50 }
+}
+```
+
+7. Подготовим playbook для подготовки к разворачиванию кластера K8S. Он потребуется для того, чтобы ожидать поднятия инстансов и обновления репозитория:
+
+```
+---
+- name: Prepare to install K8S
+  hosts: all
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Wait for connection
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+
+  tasks:
+    - name: Packages-update
+      ansible.builtin.apt:
+        update_cache: true
+
+```
+
+8. Подготовим playbook для автоматизации настройки kubeconfig для пользователя:
+
+```
+- name: Cofigure K8S
+  hosts: kube_control_plane
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Get user home directory
+      getent:
+        database: passwd
+        key: "{{ ansible_user }}"
+      register: user_info
+
+    - name: Extract home directory from user_info
+      set_fact:
+        home_dir: "{{ user_info.ansible_facts.getent_passwd.ubuntu[4] }}"
+
+
+    - name: Make directory for K8S
+      ansible.builtin.file:
+        path: "{{ home_dir }}/.kube"
+        state: directory
+        mode: '0755'
+
+    - name: Copy config K8S
+      ansible.builtin.copy:
+        remote_src: true
+        src: "/etc/kubernetes/admin.conf"
+        dest: "{{ home_dir }}/.kube/config"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+```
+
+9. Подготовим playbook для запуска установки K8S:
+
+```
+---
+- name: Prepare and install k8s
+  ansible.builtin.import_playbook: prepare.yml
+
+- name: Install K8S
+  ansible.builtin.import_playbook: kubespray/cluster.yml
+
+- name: Copy config k8s
+  ansible.builtin.import_playbook: finish-k8s.yml
+
+```
+
+10. Опишем конфигурацию terraform для подготовки inventory и запуска playbook:
+
+```
+resource "local_file" "hosts_yml" {
+  depends_on = [
+    yandex_compute_instance.masters,
+    yandex_compute_instance.workers,
+  ]
+  content = templatefile("${path.module}/hosts.tftpl",
+    {
+      masters = yandex_compute_instance.masters[*],
+      workers  = yandex_compute_instance.workers[*],
+    })
+  filename = "${abspath(path.module)}/../ansible/hosts.yml"
+}
+
+resource "null_resource" "install-k8s" {
+  depends_on = [
+    yandex_compute_instance.masters,
+    yandex_compute_instance.workers,
+    # null_resource.prepare-k8s,
+  ]
+  
+  
+  provisioner "local-exec" {
+    command = "export ANSIBLE_HOST_KEY_CHECKING=False; ansible-playbook -i ../ansible/hosts.yml -b ../ansible/install-k8s.yml"
+  }  
+   
+}
+
+```
+
+11. Выполняем команду ```terraform apply``` для поднятия инстансов и разворачивания кластера K8S.
+12. Проверим созданные инстансы:
+
+![image](https://github.com/user-attachments/assets/99244e28-c9d1-4701-be8b-d775e06c202d)
+
+13. Посмотрим как сформирован inventory:
+
+```
+---
+all:
+  vars:
+    ansible_ssh_user: ubuntu
+    become: true
+
+  hosts:
+    master-1:
+      ansible_host: 89.169.152.97
+    worker-1:
+      ansible_host: 89.169.150.227
+    worker-2:
+      ansible_host: 89.169.166.52
+    worker-3:
+      ansible_host: 51.250.40.137
+  children:
+    kube_control_plane:
+      hosts:
+        master-1:
+    kube_node:
+      hosts:
+        worker-1:
+        worker-2:
+        worker-3:
+    etcd:
+      hosts:
+        master-1:
+    k8s_cluster:
+      children:
+        kube_control_plane:
+        kube_node:
+    calico_rr:
+      hosts: {}
+
+```
+
+14. Подключимся к мастер-ноде и проверим состояние нод от пользователя ubuntu:
+
+![image](https://github.com/user-attachments/assets/6e643ec3-f534-41ba-8144-dd6e3b356ddd)
+
+
+15. Проверим состояние подов в кластере:
+
+![image](https://github.com/user-attachments/assets/45c57888-d885-4588-aaf4-4e93c6e06b84)
+
+
+
 ---
 ### Создание тестового приложения
 
@@ -252,6 +539,14 @@ Destroy complete! Resources: 4 destroyed.
 
 1. Git репозиторий с тестовым приложением и Dockerfile.
 2. Регистри с собранным docker image. В качестве регистри может быть DockerHub или [Yandex Container Registry](https://cloud.yandex.ru/services/container-registry), созданный также с помощью terraform.
+
+
+### Выполнение
+
+1. Создадим отдельный git репозиторий:
+
+![image](https://github.com/user-attachments/assets/92d15af0-5bbd-4c12-afb4-87f0ffa5aee5)
+
 
 ---
 ### Подготовка cистемы мониторинга и деплой приложения
