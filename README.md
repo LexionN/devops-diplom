@@ -547,6 +547,66 @@ all:
 
 ![image](https://github.com/user-attachments/assets/92d15af0-5bbd-4c12-afb4-87f0ffa5aee5)
 
+2. Создадим статическую страницу для конфигурации nginx:
+
+```
+<html>
+<head>
+Hey, Netology
+</head>
+<body>
+<h1>I will be DevOps Engineer!</h1>
+<h2>version 1.0.0</h2>
+</body>
+</html>
+```
+
+3. Создадим Dockerfile:
+
+```
+FROM nginx:1.21.1
+COPY index.html /usr/share/nginx/html/index.html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+
+```
+
+4. Дополним конфигурацию terraform новым файлом ```registry.tf```. Данная конфигурация позволит создать регистри в yandex cloud, собрать image образа и разместить образ в созданном регистри:
+
+```
+resource "yandex_container_registry" "my_registry" {
+  name      = "my-registry"
+}
+
+resource "null_resource" "docker" {
+  triggers = {
+    always_run = "${timestamp()}"
+  }
+  
+  depends_on = [yandex_container_registry.my_registry]
+  
+  #Создаем image контейнера
+  provisioner "local-exec" {
+    command = "docker build . -t cr.yandex/${yandex_container_registry.my_registry.id}/nginx:1.0.0 -f Dockerfile"
+    working_dir = "../docker"
+  }  
+
+  #Размещаем image в созданном registry
+  provisioner "local-exec" {
+    command = "docker push cr.yandex/${yandex_container_registry.my_registry.id}/nginx:1.0.0"
+    working_dir = "../docker"
+  }  
+  
+}
+
+```
+
+5. Применяем конфигурацию terraform командой ```terraform apply```
+6. Проверяем результат в консоли управления yandex:
+
+![image](https://github.com/user-attachments/assets/f5e54a88-e1a0-4038-9a9a-b0d15aceedf5)
+
+
 
 ---
 ### Подготовка cистемы мониторинга и деплой приложения
