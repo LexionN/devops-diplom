@@ -20,3 +20,5 @@ export TF_VAR_access_key=$ACCESS_KEY_ID
 export TF_VAR_secret_key=$SECRET_ACCESS_KEY
 export TF_VAR_account_id=$ID_SA
 
+
+

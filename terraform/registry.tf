@@ -2,11 +2,21 @@ resource "yandex_container_registry" "my_registry" {
   name      = "my-registry"
 }
 
-# resource "yandex_container_registry_iam_binding" "puller" {
-#   registry_id = yandex_container_registry.my_registry.id
-#   role        = "container-registry.images.puller"
+resource "null_resource" "docker" {
+  triggers = {
+    always_run = "${timestamp()}"
+  }
+  depends_on = [yandex_container_registry.my_registry]
+  
+  #Создаем image контейнера
+  provisioner "local-exec" {
+    command = "docker build . -t cr.yandex/${yandex_container_registry.my_registry.id}/nginx:1.0.0 -f Dockerfile"
+    working_dir = "../docker"
+  }  
 
-#   members = [
-#     "serviceAccount:var.account_id",
-#   ]
-# }
+  #Размещаем image в созданном registry
+  provisioner "local-exec" {
+    command = "docker push cr.yandex/${yandex_container_registry.my_registry.id}/nginx:1.0.0"
+    working_dir = "../docker"
+  }  
+}

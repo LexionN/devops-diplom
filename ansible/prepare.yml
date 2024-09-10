@@ -10,6 +10,106 @@
         timeout: 300
 
   tasks:
+
     - name: Packages-update
       ansible.builtin.apt:
         update_cache: true
+
+- name: Prepare to install K8S
+  hosts: localhost
+  become: false
+  gather_facts: false
+
+  tasks:
+
+    - name: Clone kubespay
+      git:
+        repo: https://github.com/kubernetes-sigs/kubespray.git
+        dest: kubespray
+
+
+
+
+# - name: Install cluster
+#   hosts: kube_control_plane[0]
+#   become: true
+#   gather_facts: false
+  
+#   tasks:
+
+#     - name: Install packages
+#       ansible.builtin.apt:
+#           name:
+#             - git
+#             - python3-pip
+#             - python3-venv
+            
+    
+#     - name: Copy SSH private key to master
+#       ansible.builtin.copy:
+#         src: '~/.ssh/id_rsa'
+#         dest: '~/.ssh/id_rsa'
+#         mode: '0600'
+
+#     - name: Copy inventory to master
+#       ansible.builtin.copy:
+#         src: hosts.yml
+#         dest: ~/hosts.yml
+#         mode: '0644'
+    
+#     - name: Clone kubespay
+#       git:
+#         repo: https://github.com/kubernetes-sigs/kubespray.git
+#         dest: ~/kubespray
+
+#     - name: Install requirements
+#       pip:
+#         requirements: ~/kubespray/requirements.txt
+#         virtualenv: ~/venv
+#         virtualenv_command: 'python3 -m venv'
+#       tags:
+#         - venv
+#       environment:
+#         PATH: "{{ ansible_env.PATH }}:{{ ansible_user_dir }}/.local/bin"
+
+
+#     - name: Install K8S
+#        ansible.builtin.shell:
+#          cmd: "~/venv/bin/ansible-playbook -i ../hosts.yml -b  playbooks/cluster.yml"
+#          chdir: "~/kubespray"
+#        environment: 
+#          ANSIBLE_HOST_KEY_CHECKING: False
+#        async: 1200
+#        poll: 10
+
+
+# - name: Cofigure K8S
+#   hosts: kube_control_plane
+#   become: true
+#   gather_facts: false
+
+#   tasks:
+#     - name: Get user home directory
+#       getent:
+#         database: passwd
+#         key: "{{ ansible_user }}"
+#       register: user_info
+
+#     - name: Extract home directory from user_info
+#       set_fact:
+#         home_dir: "{{ user_info.ansible_facts.getent_passwd.ubuntu[4] }}"
+
+
+#     - name: Make directory for K8S
+#       ansible.builtin.file:
+#         path: "{{ home_dir }}/.kube"
+#         state: directory
+#         mode: '0755'
+
+#     - name: Copy config K8S
+#       ansible.builtin.copy:
+#         remote_src: true
+#         src: "/etc/kubernetes/admin.conf"
+#         dest: "{{ home_dir }}/.kube/config"
+#         owner: "{{ ansible_user }}"
+#         group: "{{ ansible_user }}"
