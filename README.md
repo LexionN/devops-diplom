@@ -302,8 +302,7 @@ resource "yandex_compute_instance" "masters" {
 }
 ```
 
-3. Для разворачивания кластера с помощью Kubespray склонируем репозиторий командой ```$ git clone https://github.com/kubernetes-sigs/kubespray.git```
-4. Для подготовки inventory, воспользуемся шаблоном terraform:
+3. Для подготовки inventory, воспользуемся шаблоном terraform:
 
 ```
 ---
@@ -346,7 +345,7 @@ all:
 
 ```
 
-5. В последних версиях Kubespray при запуске playbook из сторонней директории возникает ошибка ``` ERROR! the role 'kubespray-defaults' was not found ```. Чтобы избежать появления ошибки, сфоррмируем конфигурацию ansible.cfg и расположим её в папке с кодом terraform:
+4. В последних версиях Kubespray при запуске playbook из сторонней директории возникает ошибка ``` ERROR! the role 'kubespray-defaults' was not found ```. Чтобы избежать появления ошибки, сфоррмируем конфигурацию ansible.cfg и расположим её в папке с кодом terraform:
 
 ```
 [defaults]
@@ -354,7 +353,7 @@ library = ..ansible/kubespray/library
 roles_path = ../ansible/kubespray/roles
 ```
 
-6. Подготовим переменные для указания характеристик создаваемых инстансов:
+5. Подготовим переменные для указания характеристик создаваемых инстансов:
 
 ```
 vms_resources = {
@@ -363,7 +362,7 @@ vms_resources = {
 }
 ```
 
-7. Подготовим playbook для подготовки к разворачиванию кластера K8S. Он потребуется для того, чтобы ожидать поднятия инстансов и обновления репозитория:
+6. Подготовим playbook для подготовки к разворачиванию кластера K8S. Он потребуется для того, чтобы ожидать поднятия инстансов и обновления репозитория:
 
 ```
 ---
@@ -381,6 +380,18 @@ vms_resources = {
     - name: Packages-update
       ansible.builtin.apt:
         update_cache: true
+
+- name: Prepare to install K8S
+  hosts: localhost
+  become: false
+  gather_facts: false
+
+  tasks:
+
+    - name: Clone kubespay
+      git:
+        repo: https://github.com/kubernetes-sigs/kubespray.git
+        dest: kubespray
 
 ```
 
@@ -455,10 +466,8 @@ resource "null_resource" "install-k8s" {
   depends_on = [
     yandex_compute_instance.masters,
     yandex_compute_instance.workers,
-    # null_resource.prepare-k8s,
   ]
-  
-  
+   
   provisioner "local-exec" {
     command = "export ANSIBLE_HOST_KEY_CHECKING=False; ansible-playbook -i ../ansible/hosts.yml -b ../ansible/install-k8s.yml"
   }  
