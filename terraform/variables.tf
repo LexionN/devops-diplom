@@ -88,3 +88,7 @@ variable "account_id" {
   default     = ""  # Можно оставить пустым
 }
 
+variable "ssh_pub" {
+  description = "Service account ID"
+  default     = ""  # Можно оставить пустым
+}
