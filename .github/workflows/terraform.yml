@@ -10,6 +10,9 @@ env:
   TF_VAR_access_key: ${{ secrets.TF_VAR_access_key }}
   TF_VAR_secret_key: ${{ secrets.TF_VAR_secret_key }}
   TF_VAR_account_id: ${{ secrets.TF_VAR_account_id }}
+  TF_VAR_cloud_id: ${{ secrets.cloud_id }}
+  TF_VAR_folder_id: ${{ secrets.folder_id }}
+  TF_VAR_default_zone: ${{ secrets.default_zone }}
 
 jobs:
   terraform:
