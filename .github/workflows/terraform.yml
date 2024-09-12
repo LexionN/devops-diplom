@@ -35,23 +35,23 @@ jobs:
       id: init
       run: |
         terraform -chdir=terraform init
-        echo "init_output=$(terraform -chdir=terraform output)" >> $GITHUB_ENV
+        echo "init_output=$(terraform -chdir=terraform output -json)" >> $GITHUB_ENV
 
     - name: Terraform Validate
       id: validate
       run: |
         terraform -chdir=terraform validate
-        echo "validate_output=$(terraform -chdir=terraform output)" >> $GITHUB_ENV
+        echo "validate_output=$(terraform -chdir=terraform output -json)" >> $GITHUB_ENV
 
     - name: Terraform Plan
       id: plan
       run: |
         terraform -chdir=terraform plan -out=tfplan
         echo "tfplan=$(base64 tfplan)" >> $GITHUB_ENV
-        echo "plan_output=$(terraform -chdir=terraform output)" >> $GITHUB_ENV
+        echo "plan_output=$(terraform -chdir=terraform output -json)" >> $GITHUB_ENV
 
     - name: Terraform Apply
       id: apply
       run: |
         terraform -chdir=terraform apply -auto-approve tfplan
-        echo "apply_output=$(terraform -chdir=terraform output)" >> $GITHUB_ENV
+        echo "apply_output=$(terraform -chdir=terraform output -json)" >> $GITHUB_ENV
