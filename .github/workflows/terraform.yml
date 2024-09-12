@@ -32,10 +32,8 @@ jobs:
 
     - name: Terraform Init
       id: init
-      run: |
-        terraform -chdir=terraform  -out=tfinit init
-        echo "tfinit=$(base64 tfinit)" >> $GITHUB_ENV
-      
+      run: terraform -chdir=terraform init
+         
 
     - name: Terraform Validate
       id: validate
