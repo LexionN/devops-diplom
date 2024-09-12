@@ -19,8 +19,8 @@ resource "yandex_compute_instance" "masters" {
   }
 
   network_interface {
-    subnet_id = yandex_vpc_subnet.public_subnet[0].id
-    nat       = true
+    subnet_id = yandex_vpc_subnet.private_subnet[0].id
+    nat       = false
     
   }
   metadata = local.metadata_vm

@@ -20,8 +20,8 @@ resource "yandex_compute_instance" "workers" {
   }
 
   network_interface {
-    subnet_id = yandex_vpc_subnet.public_subnet[count.index].id
-    nat       = true
+    subnet_id = yandex_vpc_subnet.private_subnet[count.index].id
+    nat       = false
   }
   metadata = local.metadata_vm
 }
