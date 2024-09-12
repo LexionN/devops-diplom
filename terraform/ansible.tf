@@ -4,7 +4,7 @@ resource "local_file" "hosts_yml" {
     yandex_compute_instance.workers,
     yandex_compute_instance.nat-instance,
   ]
-  content = templatefile("${path.module}/hosts.tftpl",
+  content = templatefile("${abspath(path.module)}/hosts.tftpl",
     {
       masters = yandex_compute_instance.masters[*],
       workers  = yandex_compute_instance.workers[*],
@@ -21,7 +21,7 @@ resource "null_resource" "install-k8s" {
   ]
   
   provisioner "local-exec" {
-    command = "export ANSIBLE_HOST_KEY_CHECKING=False; ansible-playbook -i ${path.module}/../ansible/hosts.yml -b ${path.module}/../ansible/install-k8s.yml"
+    command = "export ANSIBLE_HOST_KEY_CHECKING=False; ansible-playbook -i ${abspath(path.module)}/../ansible/hosts.yml -b ${abspath(path.module)}/../ansible/install-k8s.yml"
   }  
    
 }
