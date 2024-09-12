@@ -22,6 +22,11 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v1
 
+    - name: Create service account key file
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SA_IAM_KEY }}" > ~/.ssh/sa-iam.json
+
     - name: Terraform Init
       run: terraform -chdir=terraform init
 
