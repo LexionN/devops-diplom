@@ -117,8 +117,8 @@ terraform {
 ```
 locals {
     vpc_zone = tolist ([
-      "ru-central1-a", 
-      "ru-central1-b",
+      "ru-central1-b", 
+      "ru-central1-a",
       "ru-central1-d"
     ])
 }
@@ -238,7 +238,72 @@ Destroy complete! Resources: 4 destroyed.
 
 ### Выполнение
 
-1. Для выполнения задания нам понадобится 3 рабочих ноды, расположенные в разных подсетях:
+1. В качестве защиты кластера, разместим ноды в private сети, доступ к интернету будет осуществляться через nat-instance. Подключение к нодам кластера k8s, также через nat-instance.
+
+2. Создадим описание routing.tf:
+
+```
+resource "yandex_vpc_route_table" "netology-routing" {
+  name       = "netology-routing"
+  network_id = yandex_vpc_network.network_vpc.id
+  static_route {
+    destination_prefix = "0.0.0.0/0"
+    next_hop_address   = "192.168.10.254"
+  }
+}
+```
+
+4. Изменим vpc.tf:
+
+```
+resource "yandex_vpc_network" "network_vpc" {
+  name = var.vpc_name
+}
+
+resource "yandex_vpc_subnet" "private_subnet" {
+  count          = length(local.vpc_zone)
+  name           = "private_${local.vpc_zone[count.index]}"
+  zone           = local.vpc_zone[count.index]
+  network_id     = yandex_vpc_network.network_vpc.id
+  v4_cidr_blocks = [var.private_cidr[count.index]]
+  route_table_id = yandex_vpc_route_table.netology-routing.id
+}
+
+resource "yandex_vpc_subnet" "public_subnet" {
+  name           = "public_${local.vpc_zone[0]}"
+  zone           = local.vpc_zone[0]
+  network_id     = yandex_vpc_network.network_vpc.id
+  v4_cidr_blocks = var.public_cidr
+}
+
+```
+5. Создадим nat-instance.tf:
+
+```
+resource "yandex_compute_instance" "nat-instance" {
+  name = "nat-instance"
+  hostname = "nat-instance"
+  zone     = local.vpc_zone[0]
+   resources {
+   cores=var.vms_resources.nat_vm.cores
+   memory=var.vms_resources.nat_vm.memory
+   core_fraction=var.vms_resources.nat_vm.core_fraction
+  }
+  boot_disk {
+    initialize_params {
+      image_id = "fd80mrhj8fl2oe87o4e1"
+    }
+  }
+  network_interface {
+    subnet_id = yandex_vpc_subnet.public_subnet.id
+    ip_address = "192.168.10.254"
+    nat       = true
+  }
+  metadata = local.metadata_vm
+}
+```
+
+6. Для выполнения задания нам понадобится 3 рабочих ноды, расположенные в разных подсетях:
 
 ```
 resource "yandex_compute_instance" "workers" {
@@ -263,14 +328,14 @@ resource "yandex_compute_instance" "workers" {
   }
 
   network_interface {
-    subnet_id = yandex_vpc_subnet.public_subnet[count.index].id
-    nat       = true
+    subnet_id = yandex_vpc_subnet.private_subnet[count.index].id
+    nat       = false
   }
   metadata = local.metadata_vm
 }
 ```
 
-2. Также понадобится как минимум 1 мастер нода:
+7. Также понадобится как минимум 1 мастер нода:
 
 ```
 resource "yandex_compute_instance" "masters" {
@@ -294,32 +359,38 @@ resource "yandex_compute_instance" "masters" {
   }
 
   network_interface {
-    subnet_id = yandex_vpc_subnet.public_subnet[0].id
-    nat       = true
+    subnet_id = yandex_vpc_subnet.private_subnet[0].id
+    nat       = false
     
   }
   metadata = local.metadata_vm
 }
 ```
 
-3. Для разворачивания кластера с помощью Kubespray склонируем репозиторий командой ```$ git clone https://github.com/kubernetes-sigs/kubespray.git```
-4. Для подготовки inventory, воспользуемся шаблоном terraform:
+8. Для подготовки inventory, воспользуемся шаблоном terraform:
 
 ```
 ---
 all:
   vars:
     ansible_ssh_user: ubuntu
+    ansible_ssh_private_key_file: ~/.ssh/id_rsa
+    ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ubuntu@${nat-instance["network_interface"][0]["nat_ip_address"]} -i ~/.ssh/id_rsa"'
     become: true
+
 
   hosts:
     %{~ for i in masters ~}
     ${i["name"]}:
       ansible_host: ${i["network_interface"][0]["nat_ip_address"] == "" ? i["network_interface"][0]["ip_address"] : i["network_interface"][0]["nat_ip_address"]}
+      ip: ${i["network_interface"][0]["ip_address"]}
+      access_ip: ${i["network_interface"][0]["ip_address"]}
     %{~ endfor ~}
     %{~ for i in workers ~}
     ${i["name"]}:
       ansible_host: ${i["network_interface"][0]["nat_ip_address"] == "" ? i["network_interface"][0]["ip_address"] : i["network_interface"][0]["nat_ip_address"]}
+      ip: ${i["network_interface"][0]["ip_address"]}
+      access_ip: ${i["network_interface"][0]["ip_address"]}
     %{~ endfor ~}
   children:
     kube_control_plane:
@@ -346,7 +417,7 @@ all:
 
 ```
 
-5. В последних версиях Kubespray при запуске playbook из сторонней директории возникает ошибка ``` ERROR! the role 'kubespray-defaults' was not found ```. Чтобы избежать появления ошибки, сфоррмируем конфигурацию ansible.cfg и расположим её в папке с кодом terraform:
+9. В последних версиях Kubespray при запуске playbook из сторонней директории возникает ошибка ``` ERROR! the role 'kubespray-defaults' was not found ```. Чтобы избежать появления ошибки, сфоррмируем конфигурацию ansible.cfg и расположим её в папке с кодом terraform:
 
 ```
 [defaults]
@@ -354,17 +425,19 @@ library = ..ansible/kubespray/library
 roles_path = ../ansible/kubespray/roles
 ```
 
-6. Подготовим переменные для указания характеристик создаваемых инстансов:
+10. Подготовим переменные для указания характеристик создаваемых инстансов:
 
 ```
 vms_resources = {
+  nat_vm = { cores=2, memory=2, core_fraction=20 }
   workers_vm = { cores=2, memory=4, core_fraction=50 }
   masters_vm = { cores=2, memory=4, core_fraction=50 }
 }
+
 ```
 
-7. Подготовим playbook для подготовки к разворачиванию кластера K8S. Он потребуется для того, чтобы ожидать поднятия инстансов и обновления репозитория:
-
+11. Подготовим playbook для подготовки к разворачиванию кластера K8S. Он потребуется для того, чтобы ожидать поднятия инстансов и клонирование репозитория kubespray:
+    
 ```
 ---
 - name: Prepare to install K8S
@@ -376,15 +449,21 @@ vms_resources = {
     - name: Wait for connection
       ansible.builtin.wait_for_connection:
         timeout: 300
+ 
+- name: Prepare to install K8S
+  hosts: localhost
+  become: false
+  gather_facts: false
 
   tasks:
-    - name: Packages-update
-      ansible.builtin.apt:
-        update_cache: true
+    - name: Clone kubespay
+      git:
+        repo: https://github.com/kubernetes-sigs/kubespray.git
+        dest: kubespray
 
 ```
 
-8. Подготовим playbook для автоматизации настройки kubeconfig для пользователя:
+12. Подготовим playbook для автоматизации настройки kubeconfig для пользователя:
 
 ```
 - name: Cofigure K8S
@@ -420,7 +499,7 @@ vms_resources = {
 
 ```
 
-9. Подготовим playbook для запуска установки K8S:
+13. Подготовим playbook для запуска установки K8S:
 
 ```
 ---
@@ -435,18 +514,20 @@ vms_resources = {
 
 ```
 
-10. Опишем конфигурацию terraform для подготовки inventory и запуска playbook:
+14. Опишем конфигурацию terraform для подготовки inventory и запуска playbook:
 
 ```
 resource "local_file" "hosts_yml" {
   depends_on = [
     yandex_compute_instance.masters,
     yandex_compute_instance.workers,
+    yandex_compute_instance.nat-instance,
   ]
   content = templatefile("${path.module}/hosts.tftpl",
     {
       masters = yandex_compute_instance.masters[*],
       workers  = yandex_compute_instance.workers[*],
+      nat-instance = yandex_compute_instance.nat-instance,
     })
   filename = "${abspath(path.module)}/../ansible/hosts.yml"
 }
@@ -455,9 +536,8 @@ resource "null_resource" "install-k8s" {
   depends_on = [
     yandex_compute_instance.masters,
     yandex_compute_instance.workers,
-    # null_resource.prepare-k8s,
+    yandex_compute_instance.nat-instance,
   ]
-  
   
   provisioner "local-exec" {
     command = "export ANSIBLE_HOST_KEY_CHECKING=False; ansible-playbook -i ../ansible/hosts.yml -b ../ansible/install-k8s.yml"
@@ -467,10 +547,16 @@ resource "null_resource" "install-k8s" {
 
 ```
 
-11. Выполняем команду ```terraform apply``` для поднятия инстансов и разворачивания кластера K8S.
-12. Проверим созданные инстансы:
+15. Выполняем команду ```terraform apply``` для поднятия инстансов и разворачивания кластера K8S.
+    
+16. Проверим созданные инстансы:
 
-![image](https://github.com/user-attachments/assets/99244e28-c9d1-4701-be8b-d775e06c202d)
+![image](https://github.com/user-attachments/assets/2899b04f-286a-4e90-a592-0da32f0320fe)
+
+17. Посмотрим схему сети:
+
+![image](https://github.com/user-attachments/assets/fd271ec9-2373-4cfe-83e8-035b55cda832)
+
 
 13. Посмотрим как сформирован inventory:
 
@@ -479,17 +565,28 @@ resource "null_resource" "install-k8s" {
 all:
   vars:
     ansible_ssh_user: ubuntu
+    ansible_ssh_private_key_file: ~/.ssh/id_rsa
+    ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ubuntu@158.160.18.66 -i ~/.ssh/id_rsa"'
     become: true
+
 
   hosts:
     master-1:
-      ansible_host: 89.169.152.97
+      ansible_host: 10.0.10.32
+      ip: 10.0.10.32
+      access_ip: 10.0.10.32
     worker-1:
-      ansible_host: 89.169.150.227
+      ansible_host: 10.0.10.33
+      ip: 10.0.10.33
+      access_ip: 10.0.10.33
     worker-2:
-      ansible_host: 89.169.166.52
+      ansible_host: 10.0.20.23
+      ip: 10.0.20.23
+      access_ip: 10.0.20.23
     worker-3:
-      ansible_host: 51.250.40.137
+      ansible_host: 10.0.30.11
+      ip: 10.0.30.11
+      access_ip: 10.0.30.11
   children:
     kube_control_plane:
       hosts:
@@ -513,12 +610,12 @@ all:
 
 14. Подключимся к мастер-ноде и проверим состояние нод от пользователя ubuntu:
 
-![image](https://github.com/user-attachments/assets/6e643ec3-f534-41ba-8144-dd6e3b356ddd)
+![image](https://github.com/user-attachments/assets/2c97ee6c-be11-4ff3-bf39-4d3e224accb2)
 
 
 15. Проверим состояние подов в кластере:
 
-![image](https://github.com/user-attachments/assets/45c57888-d885-4588-aaf4-4e93c6e06b84)
+![image](https://github.com/user-attachments/assets/bc5184c9-dbc6-4afa-8b01-3ef08242d111)
 
 
 
@@ -628,6 +725,207 @@ resource "null_resource" "docker" {
 2. Http доступ к web интерфейсу grafana.
 3. Дашборды в grafana отображающие состояние Kubernetes кластера.
 4. Http доступ к тестовому приложению.
+
+
+### Выполнение
+
+1. Создадим playbook для автоматизации разворачивания мониторинга:
+
+```
+- name: Install monitoring stack
+  hosts: kube_control_plane
+  become: false
+  gather_facts: false
+
+  tasks:
+
+    - name: Clone kube-prometheus
+      git:
+        repo: https://github.com/prometheus-operator/kube-prometheus.git
+        dest: kube-prometheus
+
+    - name: Create the namespace and CRDs
+      ansible.builtin.command:
+        cmd: 'kubectl apply --server-side -f manifests/setup'
+        chdir: 'kube-prometheus/'
+
+    - name: Wait for namespace to be available
+      ansible.builtin.command:
+        cmd: 'kubectl wait --for condition=Established --all CustomResourceDefinition --namespace=monitoring'
+        chdir: 'kube-prometheus/'
+
+    - name: Deployment kube-prometheus
+      ansible.builtin.command:
+        cmd: 'kubectl apply -f manifests/'
+        chdir: 'kube-prometheus/'
+   
+    - name: Copy service grafana
+      ansible.builtin.copy:
+        src: '../k8s/service-grafana.yml'
+        dest: '~/'
+        mode: '0644'
+
+    - name: Apply service grafana
+      ansible.builtin.command:
+        cmd: 'kubectl apply -f ~/service-grafana.yml -n monitoring'
+    
+    - name: Copy network policy
+      ansible.builtin.copy:
+        src: '../k8s/network-policy.yml'
+        dest: '~/'
+    
+    - name: Apply network policy for grafana
+      ansible.builtin.command:
+        cmd: 'kubectl apply -f ~/network-policy.yml -n monitoring'
+
+```
+
+2. Создадим сервис nodePort:
+
+```
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+spec:
+  selector:
+    app.kubernetes.io/name: grafana
+  ports:
+    - name: grafana-http
+      protocol: TCP
+      port: 3000
+      nodePort: 31000
+      targetPort: 3000
+  type: NodePort
+
+```
+
+3. Создадим политики доступа:
+
+```
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/component: grafana
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: kube-prometheus
+  name: grafana
+  namespace: monitoring
+spec:
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - port: 3000
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: grafana
+      app.kubernetes.io/name: grafana
+      app.kubernetes.io/part-of: kube-prometheus
+  policyTypes:
+  - Egress
+  - Ingress
+```
+
+4. Создадим баллансировщик:
+
+```
+# Создаю группу балансировщика
+resource "yandex_lb_target_group" "nlb-group" {
+  name       = "nlb-group"
+  depends_on = [yandex_compute_instance.workers]
+  dynamic "target" {
+    for_each = yandex_compute_instance.workers
+    content { 
+      subnet_id = target.value.network_interface.0.subnet_id
+      address   = target.value.network_interface.0.ip_address
+    }
+  }
+}
+
+# Создаю балансировщик grafana
+resource "yandex_lb_network_load_balancer" "nlb-grafana" {
+  name = "nlb-grafana"
+  listener {
+    name        = "grafana-listener"
+    port        = 3000
+    target_port = 31000
+    external_address_spec {
+      ip_version = "ipv4"
+    }
+  }
+  attached_target_group {
+    target_group_id = yandex_lb_target_group.nlb-group.id
+    healthcheck {
+      name = "healthcheck-grafana"
+      tcp_options {
+        port = 31000
+      }
+    }
+  }
+  depends_on = [yandex_lb_target_group.nlb-group]
+}
+
+```
+
+5. Для удобства создадим output.tf, который выведет адрес графаны:
+
+```
+output "Grafana_address" {
+  value = [
+    for listener in yandex_lb_network_load_balancer.nlb-grafana.listener :
+    [
+      for spec in listener.external_address_spec :
+      "http://${spec.address}:${listener.port}"
+    ][0]
+  ][0]
+}
+
+```
+
+6. Дополним install-k8s.yml импортом playbook для установки мониторинга:
+
+```
+---
+- name: Prepare to install k8s
+  ansible.builtin.import_playbook: prepare.yml
+
+- name: Install K8S
+  ansible.builtin.import_playbook: kubespray/cluster.yml
+
+- name: Copy config k8s
+  ansible.builtin.import_playbook: finish-k8s.yml
+
+- name: Install grafana
+  ansible.builtin.import_playbook: monitoring.yml
+
+```
+
+7. Для разворачивания всех ресурсов, кластера k8s и мониторинга применим команду ```terraform apply```
+
+8. В результате:
+
+![image](https://github.com/user-attachments/assets/9467dade-bd3e-4d0d-b54c-54d6521ea090)
+
+9. Перейдем по указанному адресу, введем стандартный пароль admin/admin и откроем дашборд ```Kubernetes / Compute Resources / Node (Pods)```:
+
+![image](https://github.com/user-attachments/assets/e1b52c9a-f358-411a-9787-d8a64688616b)
+
+10. Посмотрим на созданные ресурсы ЯО:
+
+![image](https://github.com/user-attachments/assets/263b1391-65ce-4a9b-9a96-3190e26a74e7)
+
 
 ---
 ### Установка и настройка CI/CD
