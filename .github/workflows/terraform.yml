@@ -37,7 +37,10 @@ jobs:
       run: terraform -chdir=terraform validate
 
     - name: Terraform Plan
-      run: terraform -chdir=terraform plan
-
+      id: plan
+      run: |
+        terraform -chdir=terraform plan -out=tfplan
+        echo "tfplan=$(base64 tfplan)" >> $GITHUB_ENV
+    
     - name: Terraform Apply
       run: terraform -chdir=terraform apply -auto-approve
