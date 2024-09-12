@@ -117,8 +117,8 @@ terraform {
 ```
 locals {
     vpc_zone = tolist ([
-      "ru-central1-a", 
-      "ru-central1-b",
+      "ru-central1-b", 
+      "ru-central1-a",
       "ru-central1-d"
     ])
 }
@@ -238,7 +238,72 @@ Destroy complete! Resources: 4 destroyed.
 
 ### Выполнение
 
-1. Для выполнения задания нам понадобится 3 рабочих ноды, расположенные в разных подсетях:
+1. В качестве защиты кластера, разместим ноды в private сети, доступ к интернету будет осуществляться через nat-instance. Подключение к нодам кластера k8s, также через nat-instance.
+
+2. Создадим описание routing.tf:
+
+```
+resource "yandex_vpc_route_table" "netology-routing" {
+  name       = "netology-routing"
+  network_id = yandex_vpc_network.network_vpc.id
+  static_route {
+    destination_prefix = "0.0.0.0/0"
+    next_hop_address   = "192.168.10.254"
+  }
+}
+```
+
+4. Изменим vpc.tf:
+
+```
+resource "yandex_vpc_network" "network_vpc" {
+  name = var.vpc_name
+}
+
+resource "yandex_vpc_subnet" "private_subnet" {
+  count          = length(local.vpc_zone)
+  name           = "private_${local.vpc_zone[count.index]}"
+  zone           = local.vpc_zone[count.index]
+  network_id     = yandex_vpc_network.network_vpc.id
+  v4_cidr_blocks = [var.private_cidr[count.index]]
+  route_table_id = yandex_vpc_route_table.netology-routing.id
+}
+
+resource "yandex_vpc_subnet" "public_subnet" {
+  name           = "public_${local.vpc_zone[0]}"
+  zone           = local.vpc_zone[0]
+  network_id     = yandex_vpc_network.network_vpc.id
+  v4_cidr_blocks = var.public_cidr
+}
+
+```
+5. Создадим nat-instance.tf:
+
+```
+resource "yandex_compute_instance" "nat-instance" {
+  name = "nat-instance"
+  hostname = "nat-instance"
+  zone     = local.vpc_zone[0]
+   resources {
+   cores=var.vms_resources.nat_vm.cores
+   memory=var.vms_resources.nat_vm.memory
+   core_fraction=var.vms_resources.nat_vm.core_fraction
+  }
+  boot_disk {
+    initialize_params {
+      image_id = "fd80mrhj8fl2oe87o4e1"
+    }
+  }
+  network_interface {
+    subnet_id = yandex_vpc_subnet.public_subnet.id
+    ip_address = "192.168.10.254"
+    nat       = true
+  }
+  metadata = local.metadata_vm
+}
+```
+
+6. Для выполнения задания нам понадобится 3 рабочих ноды, расположенные в разных подсетях:
 
 ```
 resource "yandex_compute_instance" "workers" {
@@ -263,14 +328,14 @@ resource "yandex_compute_instance" "workers" {
   }
 
   network_interface {
-    subnet_id = yandex_vpc_subnet.public_subnet[count.index].id
-    nat       = true
+    subnet_id = yandex_vpc_subnet.private_subnet[count.index].id
+    nat       = false
   }
   metadata = local.metadata_vm
 }
 ```
 
-2. Также понадобится как минимум 1 мастер нода:
+7. Также понадобится как минимум 1 мастер нода:
 
 ```
 resource "yandex_compute_instance" "masters" {
@@ -294,31 +359,38 @@ resource "yandex_compute_instance" "masters" {
   }
 
   network_interface {
-    subnet_id = yandex_vpc_subnet.public_subnet[0].id
-    nat       = true
+    subnet_id = yandex_vpc_subnet.private_subnet[0].id
+    nat       = false
     
   }
   metadata = local.metadata_vm
 }
 ```
 
-3. Для подготовки inventory, воспользуемся шаблоном terraform:
+8. Для подготовки inventory, воспользуемся шаблоном terraform:
 
 ```
 ---
 all:
   vars:
     ansible_ssh_user: ubuntu
+    ansible_ssh_private_key_file: ~/.ssh/id_rsa
+    ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ubuntu@${nat-instance["network_interface"][0]["nat_ip_address"]} -i ~/.ssh/id_rsa"'
     become: true
+
 
   hosts:
     %{~ for i in masters ~}
     ${i["name"]}:
       ansible_host: ${i["network_interface"][0]["nat_ip_address"] == "" ? i["network_interface"][0]["ip_address"] : i["network_interface"][0]["nat_ip_address"]}
+      ip: ${i["network_interface"][0]["ip_address"]}
+      access_ip: ${i["network_interface"][0]["ip_address"]}
     %{~ endfor ~}
     %{~ for i in workers ~}
     ${i["name"]}:
       ansible_host: ${i["network_interface"][0]["nat_ip_address"] == "" ? i["network_interface"][0]["ip_address"] : i["network_interface"][0]["nat_ip_address"]}
+      ip: ${i["network_interface"][0]["ip_address"]}
+      access_ip: ${i["network_interface"][0]["ip_address"]}
     %{~ endfor ~}
   children:
     kube_control_plane:
@@ -345,7 +417,7 @@ all:
 
 ```
 
-4. В последних версиях Kubespray при запуске playbook из сторонней директории возникает ошибка ``` ERROR! the role 'kubespray-defaults' was not found ```. Чтобы избежать появления ошибки, сфоррмируем конфигурацию ansible.cfg и расположим её в папке с кодом terraform:
+9. В последних версиях Kubespray при запуске playbook из сторонней директории возникает ошибка ``` ERROR! the role 'kubespray-defaults' was not found ```. Чтобы избежать появления ошибки, сфоррмируем конфигурацию ansible.cfg и расположим её в папке с кодом terraform:
 
 ```
 [defaults]
@@ -353,16 +425,18 @@ library = ..ansible/kubespray/library
 roles_path = ../ansible/kubespray/roles
 ```
 
-5. Подготовим переменные для указания характеристик создаваемых инстансов:
+10. Подготовим переменные для указания характеристик создаваемых инстансов:
 
 ```
 vms_resources = {
+  nat_vm = { cores=2, memory=2, core_fraction=20 }
   workers_vm = { cores=2, memory=4, core_fraction=50 }
   masters_vm = { cores=2, memory=4, core_fraction=50 }
 }
+
 ```
 
-6. Подготовим playbook для подготовки к разворачиванию кластера K8S. Он потребуется для того, чтобы ожидать поднятия инстансов и обновления репозитория:
+11. Подготовим playbook для подготовки к разворачиванию кластера K8S. Он потребуется для того, чтобы ожидать поднятия инстансов и обновления репозитория:
 
 ```
 ---
@@ -375,19 +449,13 @@ vms_resources = {
     - name: Wait for connection
       ansible.builtin.wait_for_connection:
         timeout: 300
-
-  tasks:
-    - name: Packages-update
-      ansible.builtin.apt:
-        update_cache: true
-
+ 
 - name: Prepare to install K8S
   hosts: localhost
   become: false
   gather_facts: false
 
   tasks:
-
     - name: Clone kubespay
       git:
         repo: https://github.com/kubernetes-sigs/kubespray.git
@@ -395,7 +463,7 @@ vms_resources = {
 
 ```
 
-8. Подготовим playbook для автоматизации настройки kubeconfig для пользователя:
+12. Подготовим playbook для автоматизации настройки kubeconfig для пользователя:
 
 ```
 - name: Cofigure K8S
@@ -431,7 +499,7 @@ vms_resources = {
 
 ```
 
-9. Подготовим playbook для запуска установки K8S:
+13. Подготовим playbook для запуска установки K8S:
 
 ```
 ---
@@ -446,7 +514,7 @@ vms_resources = {
 
 ```
 
-10. Опишем конфигурацию terraform для подготовки inventory и запуска playbook:
+14. Опишем конфигурацию terraform для подготовки inventory и запуска playbook:
 
 ```
 resource "local_file" "hosts_yml" {
