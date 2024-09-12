@@ -32,26 +32,14 @@ jobs:
         echo "${{ secrets.SA_IAM_KEY }}" | base64 --decode > ~/.ssh/sa-iam.json
 
     - name: Terraform Init
-      id: init
-      run: |
-        terraform -chdir=terraform init
-        echo "init_output=$(terraform -chdir=terraform output -json)" >> $GITHUB_ENV
-
+      run: terraform -chdir=terraform init
+      
     - name: Terraform Validate
-      id: validate
-      run: |
-        terraform -chdir=terraform validate
-        echo "validate_output=$(terraform -chdir=terraform output -json)" >> $GITHUB_ENV
-
+      run: terraform -chdir=terraform validate
+     
     - name: Terraform Plan
-      id: plan
-      run: |
-        terraform -chdir=terraform plan -out=tfplan
-        echo "tfplan=$(base64 tfplan)" >> $GITHUB_ENV
-        echo "plan_output=$(terraform -chdir=terraform output -json)" >> $GITHUB_ENV
-
+      run: terraform -chdir=terraform plan
+      
     - name: Terraform Apply
-      id: apply
-      run: |
-        terraform -chdir=terraform apply -auto-approve tfplan
-        echo "apply_output=$(terraform -chdir=terraform output -json)" >> $GITHUB_ENV
+      run: terraform -chdir=terraform apply -auto-approve
+        
