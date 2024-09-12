@@ -11,12 +11,12 @@ resource "null_resource" "docker" {
   #Создаем image контейнера
   provisioner "local-exec" {
     command = "docker build . -t cr.yandex/${yandex_container_registry.my_registry.id}/nginx:1.0.0 -f Dockerfile"
-    working_dir = "../docker"
+    working_dir = "${path.module}/../docker"
   }  
 
   #Размещаем image в созданном registry
   provisioner "local-exec" {
     command = "docker push cr.yandex/${yandex_container_registry.my_registry.id}/nginx:1.0.0"
-    working_dir = "../docker"
+    working_dir = "${path.module}/../docker"
   }  
 }
