@@ -28,7 +28,7 @@ jobs:
     - name: Create service account key file
       run: |
         mkdir -p ~/.ssh
-        echo "${{ secrets.SA_IAM_KEY_BASE64 }}" | base64 --decode > ~/.ssh/sa-iam.json
+        echo "${{ secrets.SA_IAM_KEY }}" | base64 --decode > ~/.ssh/sa-iam.json
 
     - name: Terraform Init
       run: terraform -chdir=terraform init
