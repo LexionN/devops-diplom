@@ -33,20 +33,20 @@ jobs:
     - name: Terraform Init
       id: init
       run: |
-        terraform -chdir=terraform init -out=tfinit
+        terraform -chdir=terraform  -out=tfinit init
         echo "tfinit=$(base64 tfinit)" >> $GITHUB_ENV
       
 
     - name: Terraform Validate
       id: validate
       run: |
-        terraform -chdir=terraform validate -out=tfvalidate
+        terraform -chdir=terraform -out=tfvalidate validate
         echo "tfvalidate=$(base64 tfvalidate)" >> $GITHUB_ENV
 
     - name: Terraform Plan
       id: plan
       run: |
-        terraform -chdir=terraform plan -out=tfplan
+        terraform -chdir=terraform -out=tfplan plan
         echo "tfplan=$(base64 tfplan)" >> $GITHUB_ENV
     
     - name: Terraform Apply
