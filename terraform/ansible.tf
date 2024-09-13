@@ -20,6 +20,10 @@ resource "null_resource" "install-k8s" {
     yandex_compute_instance.nat-instance,
   ]
 
+ provisioner "local-exec" {
+    command = "ssh-add ${local.metadata_vm.ssh-keys}"
+  }  
+
   provisioner "local-exec" {
     command = "git clone https://github.com/kubernetes-sigs/kubespray.git ${path.module}/../ansible/kubespray"
   }  
