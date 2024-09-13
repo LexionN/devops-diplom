@@ -35,8 +35,8 @@ jobs:
       working-directory: terraform
       run: terraform init
 
-    - name: Echo vars
-      run: echo $TF_VAR_cloud_id
+    - name: Generate SSH key
+      run: ssh-keygen -N "" -f ~/.ssh/id_rsa
       
       
     - name: Terraform Validate
