@@ -32,14 +32,14 @@ jobs:
         echo "${{ secrets.SA_IAM_KEY }}" | base64 --decode > ~/.ssh/sa-iam.json
 
     - name: Terraform Init
-      run: terraform -chdir=terraform init
+      run: terraform -chdir=/terraform init
       
     - name: Terraform Validate
-      run: terraform -chdir=terraform validate
+      run: terraform -chdir=/terraform validate
      
     - name: Terraform Plan
-      run: terraform -chdir=terraform plan
+      run: terraform -chdir=/terraform plan
       
     - name: Terraform Apply
-      run: terraform -chdir=terraform apply -auto-approve
+      run: terraform -chdir=/terraform apply -auto-approve
         
