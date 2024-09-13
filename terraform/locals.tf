@@ -1,6 +1,6 @@
 locals {
     metadata_vm = {
-      ssh-keys = "ubuntu:${var.ssh_pub}"
+      ssh-keys = "ubuntu:${file("~/.ssh/id_rsa.pub")}"
     }
     vpc_zone = tolist ([
       "ru-central1-b", 
