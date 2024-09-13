@@ -34,6 +34,10 @@ jobs:
     - name: Terraform Init
       working-directory: terraform
       run: terraform init
+
+    - name: Echo vars
+      run: echo $TF_VAR_cloud_id
+      
       
     - name: Terraform Validate
       working-directory: terraform
