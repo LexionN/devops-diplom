@@ -20,11 +20,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+#    - name: Checkout repository
+#      uses: actions/checkout@v2
 
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
+#    - name: Setup Terraform
+#      uses: hashicorp/setup-terraform@v1
 
     - name: Create service account key file
       run: |
