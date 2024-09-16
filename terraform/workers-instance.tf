@@ -11,7 +11,7 @@ resource "yandex_compute_instance" "workers" {
   platform_id = var.platform_id
   boot_disk {
     initialize_params {
-      image_id = "fd8j0uq7qcvtb65fbffl"
+      image_id = "fd8itdevtr1oqrgeavk3"
       size     = 15
     }
   }
