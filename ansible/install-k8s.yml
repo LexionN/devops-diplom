@@ -9,6 +9,10 @@
         repo: https://github.com/kubernetes-sigs/kubespray.git
         dest: ~/kubespray
 
+    - name: Install requirements
+      pip:
+        requirements: "~/requirements.txt"
+
 - name: Prepare to install k8s
   ansible.builtin.import_playbook: prepare.yml
  
