@@ -20,7 +20,7 @@
      - name: Install ansible-core
        ansible.builtin.pip:
          name:
-           - ansible-core==2.16.5
+           - ansible==2.17.0
          state: present
          
 #     - name: Install requirements
