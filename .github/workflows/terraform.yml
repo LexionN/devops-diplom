@@ -31,13 +31,20 @@ jobs:
         mkdir -p ~/.ssh
         echo "${{ secrets.SA_IAM_KEY }}" | base64 --decode > ~/.ssh/sa-iam.json
 
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        echo "${{ secrets.ANSIBLE_SSH_PUBLIC_KEY }}" | base64 --decode > ~/.ssh/id_rsa.pub
+        chmod 600 ~/.ssh/id_rsa.pub
+        
+
     - name: Terraform Init
       working-directory: terraform
       run: terraform init
 
-    - name: Generate SSH key
-      run: ssh-keygen -N "" -f ~/.ssh/id_rsa
-      
+     
       
     - name: Terraform Validate
       working-directory: terraform
