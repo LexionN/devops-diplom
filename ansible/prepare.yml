@@ -17,14 +17,14 @@
          state: present
          update_cache: true
 
-     - name: Install ansible-core
-       ansible.builtin.pip:
-         name:
-           - ansible==9.8.0
-         state: present
+#     - name: Install ansible-core
+#       ansible.builtin.pip:
+#         name:
+#           - ansible==9.8.0
+#         state: present
          
-#     - name: Install requirements
-#       pip:
-#         requirements: https://github.com/kubernetes-sigs/kubespray/blob/master/requirements.txt
+     - name: Install requirements
+       pip:
+         requirements: https://github.com/kubernetes-sigs/kubespray/blob/master/requirements.txt
          
 
