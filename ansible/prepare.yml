@@ -14,7 +14,7 @@
        ansible.builtin.apt:
          name:
            - python3-pip
-           - ansible==2.17.0
+           
          state: present
          update_cache: true
          
