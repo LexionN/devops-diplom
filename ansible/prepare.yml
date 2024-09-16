@@ -18,14 +18,15 @@
          update_cache: true
 
 
-     - name: Copy requirements
-       ansible.builtin.copy:
-         src: ~/kubespray/requirements.txt
-         dest: ~/requirements.txt
-         mode: '0644'
+ #    - name: Copy requirements
+ #      ansible.builtin.copy:
+ #        src: ~/kubespray/requirements.txt
+ #        dest: ~/requirements.txt
+ #        mode: '0644'
          
-     - name: Install requirements
-       pip:
-         requirements: "~/requirements.txt"
+  
+ #   - name: Install requirements
+ #      pip:
+ #        requirements: "~/requirements.txt"
          
 
