@@ -24,13 +24,13 @@
 #         state: present
 
 
-     - name: Copy requirements
-       ansible.builtin.copy:
-         src: ~/kubespray/requirements.txt
-         dest: ~/requirements.txt
+ #    - name: Copy requirements
+ #      ansible.builtin.copy:
+ #        src: ~/kubespray/requirements.txt
+ #        dest: ~/requirements.txt
          
-     - name: Install requirements
-       pip:
-         requirements: ~/requirements.txt"
+ #    - name: Install requirements
+ #      pip:
+ #        requirements: ~/requirements.txt"
          
 
