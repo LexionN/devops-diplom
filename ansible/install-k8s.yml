@@ -12,7 +12,7 @@
     - name: Clone kubespay
       git:
         repo: https://github.com/kubernetes-sigs/kubespray.git
-        dest: kubespray
+        dest: ~/kubespray
 
 - name: Install K8S
   ansible.builtin.import_playbook: kubespray/cluster.yml
