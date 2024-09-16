@@ -11,7 +11,7 @@
 
     - name: Install requirements
       pip:
-        requirements: "~/requirements.txt"
+        requirements: "~/kubespray/requirements.txt"
 
 - name: Prepare to install k8s
   ansible.builtin.import_playbook: prepare.yml
