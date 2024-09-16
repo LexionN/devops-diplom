@@ -1,19 +1,7 @@
 ---
 - name: Prepare to install k8s
   ansible.builtin.import_playbook: prepare.yml
-
-- name: Clone K8S
-  hosts: localhost
-  become: false
-  gather_facts: false
-
-  tasks:
-
-    - name: Clone kubespay
-      git:
-        repo: https://github.com/kubernetes-sigs/kubespray.git
-        dest: ~/kubespray
-
+ 
 - name: Install K8S
   ansible.builtin.import_playbook: kubespray/cluster.yml
 
