@@ -17,11 +17,11 @@
          state: present
          update_cache: true
 
-#     - name: Install requirements
-#       ansible.builtin.pip:
-#         name:
-#           - 
-#        state: present
+     - name: Install requirements
+       ansible.builtin.pip:
+         name:
+           - 
+        state: present
 
 
      - name: Copy requirements
@@ -32,6 +32,6 @@
          
      - name: Install requirements
        pip:
-         requirements: ~/requirements.txt"
+         requirements: "~/requirements.txt"
          
 
