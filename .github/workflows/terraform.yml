@@ -34,9 +34,9 @@ jobs:
     - name: Set up SSH
       run: |
         mkdir -p ~/.ssh
-        echo "${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/id_rsa
+        echo "${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        echo "${{ secrets.ANSIBLE_SSH_PUBLIC_KEY }}" | base64 --decode > ~/.ssh/id_rsa.pub
+        echo "${{ secrets.ANSIBLE_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
         chmod 600 ~/.ssh/id_rsa.pub
         
 
