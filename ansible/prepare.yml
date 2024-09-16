@@ -22,9 +22,15 @@
 #         name:
 #           - ansible==9.8.0
 #         state: present
+
+
+     - name: Copy requirements
+       ansible.builtin.copy:
+         src: ~/kubespray/requirements.txt
+         dest: ~/
          
      - name: Install requirements
        pip:
-         requirements: "https://github.com/kubernetes-sigs/kubespray/blob/master/requirements.txt"
+         requirements: ~/requirements.txt"
          
 
