@@ -26,3 +26,4 @@ resource "null_resource" "install-k8s" {
   provisioner "local-exec" {
     command = "export ANSIBLE_HOST_KEY_CHECKING=False; ansible-playbook -i ${path.module}/../ansible/hosts.yml -b ${path.module}/../ansible/install-k8s.yml --extra-vars 'maximal_ansible_version=2.17.3'"
   }
+}
