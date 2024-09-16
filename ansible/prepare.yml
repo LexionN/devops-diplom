@@ -17,12 +17,6 @@
          state: present
          update_cache: true
 
-     - name: Install requirements
-       ansible.builtin.pip:
-         name:
-           - 
-        state: present
-
 
      - name: Copy requirements
        ansible.builtin.copy:
