@@ -1,17 +1,17 @@
 ---
-- name: Clone Kubespray
-  hosts: localhost
-  become: false
-  gather_facts: false
-  tasks:
-    - name: Clone Kubespray
-      git:
-        repo: https://github.com/kubernetes-sigs/kubespray.git
-        dest: ~/kubespray
+# - name: Clone Kubespray
+#   hosts: localhost
+#   become: false
+#   gather_facts: false
+#   tasks:
+#     - name: Clone Kubespray
+#       git:
+#         repo: https://github.com/kubernetes-sigs/kubespray.git
+#         dest: ~/kubespray
 
-    - name: Install requirements
-      pip:
-        requirements: "~/kubespray/requirements.txt"
+#     - name: Install requirements
+#       pip:
+#         requirements: "~/kubespray/requirements.txt"
 
 - name: Prepare to install k8s
   ansible.builtin.import_playbook: prepare.yml

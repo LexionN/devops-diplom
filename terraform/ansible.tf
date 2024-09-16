@@ -23,6 +23,12 @@ resource "null_resource" "install-k8s" {
   provisioner "local-exec" {
     command = "git clone https://github.com/kubernetes-sigs/kubespray.git ${path.module}/../ansible/kubespray"
   }  
+
+  provisioner "local-exec" {
+    command = "python3 -m pip install -r ${path.module}/../ansible/kubespray/requirements.txt"
+  }  
+
+
   provisioner "local-exec" {
     command = "export ANSIBLE_HOST_KEY_CHECKING=False; ansible-playbook -i ${path.module}/../ansible/hosts.yml -b ${path.module}/../ansible/install-k8s.yml"
   }
