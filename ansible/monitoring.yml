@@ -6,7 +6,7 @@
   tasks:
 
     - name: Clone kube-prometheus
-      git:
+      ansible.builtin.git:
         repo: https://github.com/prometheus-operator/kube-prometheus.git
         dest: kube-prometheus
 
@@ -34,7 +34,7 @@
     - name: Apply service grafana
       ansible.builtin.command:
         cmd: 'kubectl apply -f ~/service-grafana.yml -n monitoring'
-    
+
     - name: Copy network policy
       ansible.builtin.copy:
         src: '../k8s/network-policy.yml'
