@@ -9,8 +9,7 @@
       ansible.builtin.wait_for_connection:
         timeout: 300
 
-  # tasks:
-
+  tasks:
      - name: Packages-update
        ansible.builtin.apt:
          name:
