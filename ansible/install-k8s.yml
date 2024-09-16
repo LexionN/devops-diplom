@@ -1,4 +1,13 @@
 ---
+- name: Clone Kubespray
+  hosts: localhost
+  become: false
+  gather_facts: false
+  - name: Clone kubespay
+      git:
+        repo: https://github.com/kubernetes-sigs/kubespray.git
+        dest: ~/kubespray
+
 - name: Prepare to install k8s
   ansible.builtin.import_playbook: prepare.yml
  
