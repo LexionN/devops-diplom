@@ -4,7 +4,7 @@
   become: false
   gather_facts: false
   tasks:
-  - name: Clone kubespay
+    - name: Clone Kubespray
       git:
         repo: https://github.com/kubernetes-sigs/kubespray.git
         dest: ~/kubespray
