@@ -22,10 +22,7 @@
 
   tasks:
 
-    - name: Clone kubespay
-      git:
-        repo: https://github.com/kubernetes-sigs/kubespray.git
-        dest: kubespray
+    
     
     - name: Install requirements
       pip:
