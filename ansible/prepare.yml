@@ -27,7 +27,7 @@
      - name: Copy requirements
        ansible.builtin.copy:
          src: ~/kubespray/requirements.txt
-         dest: ~/
+         dest: ~/requirements.txt
          
      - name: Install requirements
        pip:
