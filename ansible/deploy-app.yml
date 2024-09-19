@@ -1,0 +1,25 @@
+---
+- name: Depoy app
+  hosts: kube_control_plane
+  gather_facts: no
+  become: false
+  vars_files:
+    - "../k8s/tf_outputs.yml"
+
+  tasks:
+  # - name: Create kube-config
+  #   ansible.builtin.command:
+  #     cmd: 'echo $kubeconfig | base64 --decode > ~/kube-config-decode'
+  - name: Change registry 
+    ansible.builtin.command:
+      cmd: 'sed -i -e "s|image:.*|image: cr.yandex/{{ vars.my_registry_id }}/nginx:latest|" ~/k8s/app-deployment.yml'
+
+  - name: Deployment to k8s
+    ansible.builtin.command:
+      cmd: "kubectl apply -f {{ item }}"
+    with_items:
+      - "~/k8s/app-deployment.yml"
+      - "~/k8s/app-networkpolicy.yml"
+      - "~/k8s/app-service.yml"
+
+  

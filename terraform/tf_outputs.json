@@ -1,0 +1,17 @@
+{
+  "Grafana_address": {
+    "sensitive": false,
+    "type": "string",
+    "value": "http://51.250.37.157:80"
+  },
+  "K8S_address": {
+    "sensitive": false,
+    "type": "string",
+    "value": "http://51.250.37.157:16443"
+  },
+  "my_registry_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "crpo2trbmev3k5pj4n1i"
+  }
+}

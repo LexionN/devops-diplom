@@ -11,7 +11,7 @@ resource "yandex_lb_target_group" "nlb-group" {
   }
 }
 
-# Создаю балансировщик grafana
+# Создаю балансировщик grafana и app
 resource "yandex_lb_network_load_balancer" "nlb-grafana" {
   name = "nlb-grafana"
   listener {
@@ -22,6 +22,16 @@ resource "yandex_lb_network_load_balancer" "nlb-grafana" {
       ip_version = "ipv4"
     }
   }
+
+    listener {
+    name        = "app-listener"
+    port        = 80
+    target_port = 31080
+    external_address_spec {
+      ip_version = "ipv4"
+    }
+  }
+
   attached_target_group {
     target_group_id = yandex_lb_target_group.nlb-group.id
     healthcheck {

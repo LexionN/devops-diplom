@@ -27,19 +27,19 @@
    
     - name: Copy service grafana
       ansible.builtin.copy:
-        src: '../k8s/service-grafana.yml'
+        src: '../k8s/grafana-service.yml'
         dest: '~/'
         mode: '0644'
 
     - name: Apply service grafana
       ansible.builtin.command:
-        cmd: 'kubectl apply -f ~/service-grafana.yml -n monitoring'
+        cmd: 'kubectl apply -f ~/grafana-service.yml -n monitoring'
 
     - name: Copy network policy
       ansible.builtin.copy:
-        src: '../k8s/network-policy.yml'
+        src: '../k8s/grafana-networkpolicy.yml'
         dest: '~/'
     
     - name: Apply network policy for grafana
       ansible.builtin.command:
-        cmd: 'kubectl apply -f ~/network-policy.yml -n monitoring'
+        cmd: 'kubectl apply -f ~/grafana-networkpolicy.yml -n monitoring'

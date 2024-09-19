@@ -62,7 +62,7 @@ variable "metadata_vm" {
  default = {
   metadata = {
     serial-port-enable = 1
-    ssh-keys           = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL3v9g02B9BMGP4/ACgME11e5UknvRBu38xd4vXs72zy lexion"
+    ssh-keys           = ""
   
   }
  }
@@ -70,21 +70,25 @@ variable "metadata_vm" {
 }
 
 variable "access_key" {
+  type        = string
   description = "Access key for Yandex Cloud Storage"
-  default     = ""  # Можно оставить пустым
+  default     = ""
 }
 
 variable "secret_key" {
+  type        = string
   description = "Secret key for Yandex Cloud Storage"
-  default     = ""  # Можно оставить пустым
+  default     = ""
 }
 
 variable "account_id" {
+  type        = string
   description = "Service account ID"
-  default     = ""  # Можно оставить пустым
+  default     = ""
 }
 
 variable "ssh_pub" {
+  type        = string
   description = "Service account ID"
-  default     = ""  # Можно оставить пустым
+  default     = ""
 }

@@ -12,6 +12,11 @@ resource "yandex_compute_instance" "nat-instance" {
       image_id = "fd80mrhj8fl2oe87o4e1"
     }
   }
+  
+  scheduling_policy {
+    preemptible = true
+  }
+
   network_interface {
     subnet_id = yandex_vpc_subnet.public_subnet.id
     ip_address = "192.168.10.254"

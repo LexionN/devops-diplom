@@ -6,6 +6,7 @@ yc iam service-account create --name sa-robot
 ID_SA=`yc iam service-account list | grep 'sa-robot' | awk '{print $2}'`
 yc resource-manager folder add-access-binding --id b1gnc2bkas267cooida6 --role editor --service-account-id $ID_SA
 yc resource-manager folder add-access-binding --id b1gnc2bkas267cooida6 --role storage.admin --service-account-id $ID_SA
+yc resource-manager folder add-access-binding --id b1gnc2bkas267cooida6 --role container-registry.admin --service-account-id $ID_SA
 yc iam access-key create --service-account-id $ID_SA --format json > ~/.ssh/sa-key.json
 yc iam key create --service-account-id $ID_SA --format json --output ~/.ssh/sa-iam.json
 

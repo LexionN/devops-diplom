@@ -10,24 +10,10 @@
         timeout: 300
 
   tasks:
-     - name: Packages-update
-       ansible.builtin.apt:
-         name:
-           - git
-           - python3-pip
-         state: present
-         update_cache: true
-
-
- #    - name: Copy requirements
- #      ansible.builtin.copy:
- #        src: ~/kubespray/requirements.txt
- #        dest: ~/requirements.txt
- #        mode: '0644'
-         
-  
- #   - name: Install requirements
- #      pip:
- #        requirements: "~/requirements.txt"
-         
-
+    - name: Packages-update
+      ansible.builtin.apt:
+        name:
+          - git
+          - python3-pip
+        state: present
+        update_cache: true
