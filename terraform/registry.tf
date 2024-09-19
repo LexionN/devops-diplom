@@ -12,6 +12,17 @@ resource "yandex_container_registry_iam_binding" "puller" {
   ]
 }
 
+# Права на push образов
+resource "yandex_container_registry_iam_binding" "pusher" {
+  registry_id = yandex_container_registry.my_registry.id
+  role        = "container-registry.images.pusher"
+
+  members = [
+    "serviceAccount:sa-robot",
+  ]
+}
+
+
 resource "null_resource" "docker" {
   # triggers = {
   #   always_run = "${timestamp()}"
