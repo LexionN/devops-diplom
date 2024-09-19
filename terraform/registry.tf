@@ -18,7 +18,7 @@ resource "yandex_container_registry_iam_binding" "pusher" {
   role        = "container-registry.images.pusher"
 
   members = [
-    "serviceAccount:sa-robot",
+    "serviceAccount:${account_id}",
   ]
 }
 
