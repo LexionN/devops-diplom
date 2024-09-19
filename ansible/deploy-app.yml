@@ -7,9 +7,6 @@
     - "../k8s/tf_outputs.yml"
 
   tasks:
-  # - name: Create kube-config
-  #   ansible.builtin.command:
-  #     cmd: 'echo $kubeconfig | base64 --decode > ~/kube-config-decode'
   - name: Change registry 
     ansible.builtin.command:
       cmd: 'sed -i -e "s|image:.*|image: cr.yandex/{{ vars.my_registry_id }}/nginx:latest|" ~/k8s/app-deployment.yml'
