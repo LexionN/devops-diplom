@@ -49,7 +49,7 @@
         - "../k8s/app-deployment.yml"
         - "../k8s/app-networkpolicy.yml"
         - "../k8s/app-service.yml"
-        - "../k8s/tf_outputs.yml"
+        
 
     - name: Copy file from remote machine to local machine
       ansible.builtin.fetch:
