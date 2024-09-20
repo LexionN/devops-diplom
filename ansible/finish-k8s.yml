@@ -54,6 +54,6 @@
     - name: Copy file from remote machine to local machine
       ansible.builtin.fetch:
         src: "{{ home_dir }}/.kube/config"
-        dest: ~/kube-config
+        dest: ../k8s/kube-config
         flat: yes
 
