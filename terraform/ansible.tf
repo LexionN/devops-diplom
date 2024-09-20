@@ -1,7 +1,4 @@
 resource "local_file" "hosts_yml" {
-  triggers = {
-    always_run = "${timestamp()}"
-  }
   depends_on = [
     yandex_compute_instance.masters,
     yandex_compute_instance.workers,
