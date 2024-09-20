@@ -86,7 +86,6 @@ jobs:
         gh secret set MY_REGISTRY_ID --body $my_registry_id --repo LexionN/devops-diplom-app
         K8S_address=$(grep 'K8S_address:'  k8s/tf_outputs.yml | cut -d ' ' -f 2)
         sed -i "s/127.0.0.1:6443/$K8S_address/g" k8s/kube-config
-        kube_config=$(base64 < k8s/kube-config | tr -d '\n')
+        kube_config=$(base64 < k8s/kube-config | tr -d '\n' | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
         gh secret set KUBE_CONFIG --body $kube_config --repo LexionN/devops-diplom-app
-   
        
