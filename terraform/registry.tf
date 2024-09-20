@@ -45,3 +45,7 @@ resource "null_resource" "docker" {
     command = "docker push cr.yandex/${yandex_container_registry.my_registry.id}/nginx:v1.0.0 && docker push cr.yandex/${yandex_container_registry.my_registry.id}/nginx:latest"
   }  
 }
+resource "local_file" "registry_id_file" {
+  filename = "../ansible/registry_id.txt"
+  content  = "my_registry_id: ${yandex_container_registry.my_registry.id}"
+}
