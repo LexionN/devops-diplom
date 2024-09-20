@@ -66,8 +66,8 @@ jobs:
     - name: Get terraform output in yml
       working-directory: terraform
       run: |
-        terraform output -json > ~/k8s/tf_outputs.json
-        jq -r 'to_entries | map(.key + ": " + .value.value) | .[]' ~/k8s/tf_outputs.json > ~/k8s/tf_outputs.yml
+        terraform output -json > ../k8s/tf_outputs.json
+        jq -r 'to_entries | map(.key + ": " + .value.value) | .[]' ../k8s/tf_outputs.json > ../k8s/tf_outputs.yml
 
     - name: Install GitHub CLI
       run: |
@@ -81,8 +81,8 @@ jobs:
 
     - name: Set secret in another repository
       run: |
-        my_registry_id=$(grep 'my_registry_id:'  ~/k8s/tf_outputs.yml | cut -d ' ' -f 2)
-        K8S_address=$(grep 'K8S_address:'  ~/k8s/tf_outputs.yml | cut -d ' ' -f 2)
+        my_registry_id=$(grep 'my_registry_id:'  ../k8s/tf_outputs.yml | cut -d ' ' -f 2)
+        K8S_address=$(grep 'K8S_address:'  ../k8s/tf_outputs.yml | cut -d ' ' -f 2)
         sed -i "s/127.0.0.1:6443/${{ env.K8S_address }}/g" ~/.kube/config
         kube_config=$(echo ~/.kube/config-nlb)
         gh secret set MY_REGISTRY_ID --body $env.my_registry_id --repo LexionN/devops-diplom-app
