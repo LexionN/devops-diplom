@@ -82,10 +82,11 @@ jobs:
     - name: Set secret in another repository
       run: |
         my_registry_id=$(grep 'my_registry_id:'  k8s/tf_outputs.yml | cut -d ' ' -f 2)
-        gh secret set MY_REGISTRY_ID --body ${{ env.my_registry_id }} --repo LexionN/devops-diplom-app
+        echo $my_registry_id
+        gh secret set MY_REGISTRY_ID --body $my_registry_id --repo LexionN/devops-diplom-app
         K8S_address=$(grep 'K8S_address:'  k8s/tf_outputs.yml | cut -d ' ' -f 2)
-        sed -i "s/127.0.0.1:6443/${{ env.K8S_address }}/g" .k8s/kube-config
+        sed -i "s/127.0.0.1:6443/$K8S_address/g" .k8s/kube-config
         kube_config=$(echo k8s/kube-config)
-        gh secret set KUBE_CONFIG --body ${{ env.kube_config }} --repo LexionN/devops-diplom-app
+        gh secret set KUBE_CONFIG --body $kube_config --repo LexionN/devops-diplom-app
    
        
