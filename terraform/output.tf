@@ -15,6 +15,16 @@ output "my_registry_id" {
 
 output "K8S_address" {
   value = [
+    for listener in yandex_lb_network_load_balancer.nlb-k8s.listener :
+    [
+      for spec in listener.external_address_spec :
+      "https://${spec.address}:${listener.port}"
+    ][0]
+  ][0]
+}
+
+output "App_address" {
+  value = [
     for listener in yandex_lb_network_load_balancer.nlb-grafana.listener :
     [
       for spec in listener.external_address_spec :
