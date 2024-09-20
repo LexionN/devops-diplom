@@ -64,6 +64,7 @@ jobs:
       run: terraform apply -auto-approve
 
     - name: Get terraform output in yml
+      working-directory: terraform
       run: |
         terraform output -json > ~/k8s/tf_outputs.json
         jq -r 'to_entries | map(.key + ": " + .value.value) | .[]' ~/k8s/tf_outputs.json > ~/k8s/tf_outputs.yml
