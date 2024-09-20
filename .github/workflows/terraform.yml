@@ -17,6 +17,8 @@ env:
   TF_VAR_cloud_id: ${{ secrets.TF_VAR_cloud_id }}
   TF_VAR_folder_id: ${{ secrets.TF_VAR_folder_id }}
   TF_VAR_default_zone: ${{ secrets.TF_VAR_default_zone }}
+  ANSIBLE_SSH_PRIVATE_KEY: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }}
+  ANSIBLE_SSH_PUBLIC_KEY: ${{ secrets.ANSIBLE_SSH_PUBLIC_KEY }}
 
 jobs:
   terraform:
@@ -37,9 +39,9 @@ jobs:
     - name: Set up SSH
       run: |
         mkdir -p ~/.ssh
-        echo "${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        echo "${{ env.ANSIBLE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        echo "${{ secrets.ANSIBLE_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+        echo "${{ env.ANSIBLE_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
         chmod 600 ~/.ssh/id_rsa.pub
         
 
