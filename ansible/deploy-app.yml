@@ -9,7 +9,7 @@
   tasks:
   - name: Change registry 
     ansible.builtin.command:
-      cmd: 'sed -i -e "s|image:.*|image: cr.yandex/{{ vars.my_registry_id }}/nginx:latest|" ~/k8s/app-deployment.yml'
+      cmd: 'sed -i -e "s|image:.*|image: cr.yandex/{{ yandex_container_registry.my_registry.id }}/nginx:latest|" ~/k8s/app-deployment.yml'
 
   - name: Deployment to k8s
     ansible.builtin.command:
