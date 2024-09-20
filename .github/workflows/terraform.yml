@@ -81,5 +81,12 @@ jobs:
     - name: Set secret in another repository
       run: |
         my_registry_id=$(grep 'my_registry_id:'  ../k8s/tf_outputs.yml | cut -d ' ' -f 2)
+        K8S_address=$(grep 'K8S_address:'  ../k8s/tf_outputs.yml | cut -d ' ' -f 2)
+        cp ~/.kube/config ~/.kube/config-nlb
+        sed -i "s/127.0.0.1:6443/${{ env.K8S_address }}/g" ~/.kube/config-nlb
+        kube_config=$(echo ~/.kube/config-nlb)
         gh secret set MY_REGISTRY_ID --body $env.my_registry_id --repo LexionN/devops-diplom-app
+        gh secret set KUBE_CONFIG --body $env.kube_config --repo LexionN/devops-diplom-app
+
+    
        
