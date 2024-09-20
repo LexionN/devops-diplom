@@ -60,4 +60,19 @@ jobs:
     - name: Terraform Apply
       working-directory: terraform
       run: terraform apply -auto-approve
+
+    - name: Install GitHub CLI
+        run: |
+          sudo apt-get install gh
+
+      - name: Login to GitHub
+        env:
+          PAT: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          echo "$PAT" | gh auth login --with-token
+
+      - name: Set secret in another repository
+        run: |
+          my_registry_id=$(grep 'my_registry_id:' your_file.txt | cut -d ' ' -f 2)
+          gh secret set MY_REGISTRY_ID --body $env.my_registry_id --repo LexionN/devops-diplom-app
        
