@@ -57,13 +57,3 @@
         dest: ~/kube-config
         flat: yes
 
-- name: Prepage kubeconfig and push to vars
-  hosts: localhost
-  become: false
-  gather_facts: false
-  vars_files:
-  - ../k8s/tf_outputs.yml
-  tasks:
-    - name: Change server address
-      ansible.builtin.command:
-        cmd: 'sed -i -e "s|server:.*|server: {{ vars.K8S_address }}|" ~/kube-config'
