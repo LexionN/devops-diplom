@@ -20,13 +20,13 @@ resource "null_resource" "install-k8s" {
     yandex_compute_instance.nat-instance,
   ]
 
-  # provisioner "local-exec" {
-  #   command = "rm -rf ${path.module}/../ansible/kubespray && git clone https://github.com/kubernetes-sigs/kubespray.git ${path.module}/../ansible/kubespray"
-  # }  
+  provisioner "local-exec" {
+    command = "rm -rf ${path.module}/../ansible/kubespray && git clone https://github.com/kubernetes-sigs/kubespray.git ${path.module}/../ansible/kubespray"
+  }  
 
-  # provisioner "local-exec" {
-  #   command = "python3 -m pip install -r ${path.module}/../ansible/kubespray/requirements.txt"
-  # }  
+  provisioner "local-exec" {
+    command = "python3 -m pip install -r ${path.module}/../ansible/kubespray/requirements.txt"
+  }  
 
 
   provisioner "local-exec" {
