@@ -70,8 +70,8 @@ jobs:
     - name: Login to GitHub
       env:
         PAT: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-        run: |
-          echo "$PAT" | gh auth login --with-token
+      run: |
+        echo "$PAT" | gh auth login --with-token
 
     - name: Set secret in another repository
       run: |
