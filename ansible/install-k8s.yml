@@ -2,8 +2,8 @@
 - name: Prepare to install k8s
   ansible.builtin.import_playbook: prepare.yml
  
-- name: Install K8S
-  ansible.builtin.import_playbook: kubespray/cluster.yml
+#- name: Install K8S
+#  ansible.builtin.import_playbook: kubespray/cluster.yml
 
 - name: Copy config k8s
   ansible.builtin.import_playbook: finish-k8s.yml
