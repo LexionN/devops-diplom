@@ -1,4 +1,7 @@
 resource "local_file" "hosts_yml" {
+  triggers = {
+    always_run = "${timestamp()}"
+  }
   depends_on = [
     yandex_compute_instance.masters,
     yandex_compute_instance.workers,
@@ -31,5 +34,21 @@ resource "null_resource" "install-k8s" {
 
   provisioner "local-exec" {
     command = "export ANSIBLE_HOST_KEY_CHECKING=False; ansible-playbook -i ${path.module}/../ansible/hosts.yml -b ${path.module}/../ansible/install-k8s.yml"
+  }
+}
+
+resource "null_resource" "copy-config-k8s" {
+  triggers = {
+    always_run = "${timestamp()}"
+  }
+  depends_on = [
+    yandex_compute_instance.masters,
+    yandex_compute_instance.workers,
+    yandex_compute_instance.nat-instance,
+    null_resource.install-k8s,
+  ]
+
+  provisioner "local-exec" {
+    command = "export ANSIBLE_HOST_KEY_CHECKING=False; ansible-playbook -i ${path.module}/../ansible/hosts.yml ${path.module}/../ansible/copy-config.yml"
   }
 }
