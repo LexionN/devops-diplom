@@ -18,7 +18,7 @@ output "K8S_address" {
     for listener in yandex_lb_network_load_balancer.nlb-k8s.listener :
     [
       for spec in listener.external_address_spec :
-      "https://${spec.address}:${listener.port}"
+      "${spec.address}:${listener.port}"
     ][0]
   ][0]
 }
