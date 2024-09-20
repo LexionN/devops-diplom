@@ -1,8 +1,8 @@
-name: Copy config K8S
+- name: Copy config K8S
   hosts: kube_control_plane
   become: false
   gather_facts: false
-
+  tasks:
     - name: Copy file from remote machine to local machine
       ansible.builtin.fetch:
         src: "~/.kube/config"
