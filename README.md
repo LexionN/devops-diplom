@@ -1324,6 +1324,25 @@ jobs:
 
 В репозитории devops-diplom-app, при создании тега происходит сборка и отправка с tag в регистри приложения, а также деплой соответствующего приложения в кластер Kubernetes.
 
+Изначально выглядит вот так:
+
+![image](https://github.com/user-attachments/assets/7d5ca045-1b22-455e-96e8-edc60326c22d)
+
+Меняем tag на v1.10.3 и через минуту обновляем страничку
+
+![image](https://github.com/user-attachments/assets/5a0658db-b084-46b5-9a81-7b537bacc8cf)
+
+
+И соответственно интерфейс графаны:
+
+![image](https://github.com/user-attachments/assets/c69a6a2f-20a6-4b33-b167-73e566b1bf47)
+
+---
+### Ссылки на ресурсы:
+
+[Веб интерфейс Grafana]http://51.250.40.207:3000
+
+[Приложение]http://51.250.40.207:80
 
 
 
