@@ -294,6 +294,11 @@ resource "yandex_compute_instance" "nat-instance" {
       image_id = "fd80mrhj8fl2oe87o4e1"
     }
   }
+  
+  scheduling_policy {
+    preemptible = true
+  }
+
   network_interface {
     subnet_id = yandex_vpc_subnet.public_subnet.id
     ip_address = "192.168.10.254"
@@ -375,8 +380,9 @@ all:
   vars:
     ansible_ssh_user: ubuntu
     ansible_ssh_private_key_file: ~/.ssh/id_rsa
-    ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ubuntu@${nat-instance["network_interface"][0]["nat_ip_address"]} -i ~/.ssh/id_rsa"'
+    ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ubuntu@${nat-instance["network_interface"][0]["nat_ip_address"]} -i {{ ansible_ssh_private_key_file }}"'
     become: true
+    ansible_python_interpreter: /usr/bin/python3
 
 
   hosts:
@@ -436,7 +442,7 @@ vms_resources = {
 
 ```
 
-11. Подготовим playbook для подготовки к разворачиванию кластера K8S. Он потребуется для того, чтобы ожидать поднятия инстансов и клонирование репозитория kubespray:
+11. Подготовим playbook для подготовки к разворачиванию кластера K8S. Он потребуется для того, чтобы ожидать поднятия инстансов и установку необходимых пакетов:
     
 ```
 ---
@@ -449,17 +455,16 @@ vms_resources = {
     - name: Wait for connection
       ansible.builtin.wait_for_connection:
         timeout: 300
- 
-- name: Prepare to install K8S
-  hosts: localhost
-  become: false
-  gather_facts: false
 
   tasks:
-    - name: Clone kubespay
-      git:
-        repo: https://github.com/kubernetes-sigs/kubespray.git
-        dest: kubespray
+    - name: Packages-update
+      ansible.builtin.apt:
+        name:
+          - git
+          - python3-pip
+        state: present
+        update_cache: true
+
 
 ```
 
@@ -470,8 +475,8 @@ vms_resources = {
   hosts: kube_control_plane
   become: true
   gather_facts: false
-
   tasks:
+
     - name: Get user home directory
       getent:
         database: passwd
@@ -482,18 +487,27 @@ vms_resources = {
       set_fact:
         home_dir: "{{ user_info.ansible_facts.getent_passwd.ubuntu[4] }}"
 
-
-    - name: Make directory for K8S
+    - name: Make directory for depoy
       ansible.builtin.file:
         path: "{{ home_dir }}/.kube"
         state: directory
         mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
 
     - name: Copy config K8S
       ansible.builtin.copy:
         remote_src: true
         src: "/etc/kubernetes/admin.conf"
         dest: "{{ home_dir }}/.kube/config"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Make directory for K8S
+      ansible.builtin.file:
+        path: "{{ home_dir }}/k8s"
+        state: directory
+        mode: '0755'
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
 
@@ -675,25 +689,52 @@ resource "yandex_container_registry" "my_registry" {
   name      = "my-registry"
 }
 
+# Права на pull образов
+resource "yandex_container_registry_iam_binding" "puller" {
+  registry_id = yandex_container_registry.my_registry.id
+  role        = "container-registry.images.puller"
+
+  members = [
+    "system:allUsers",
+  ]
+}
+
+# Права на push образов
+resource "yandex_container_registry_iam_binding" "pusher" {
+  registry_id = yandex_container_registry.my_registry.id
+  role        = "container-registry.images.pusher"
+
+  members = [
+      "system:allUsers",
+  ]
+}
+
+
 resource "null_resource" "docker" {
-  triggers = {
-    always_run = "${timestamp()}"
-  }
-  
+  # triggers = {
+  #   always_run = "${timestamp()}"
+  # }
   depends_on = [yandex_container_registry.my_registry]
   
   #Создаем image контейнера
   provisioner "local-exec" {
-    command = "docker build . -t cr.yandex/${yandex_container_registry.my_registry.id}/nginx:1.0.0 -f Dockerfile"
-    working_dir = "../docker"
+    command = "docker build . -t cr.yandex/${yandex_container_registry.my_registry.id}/nginx:v1.0.0 -f Dockerfile"
+    working_dir = "${path.root}/../docker"
+  }  
+
+  #Применяем тэг latest
+  provisioner "local-exec" {
+    command = "docker tag cr.yandex/${yandex_container_registry.my_registry.id}/nginx:v1.0.0 cr.yandex/${yandex_container_registry.my_registry.id}/nginx:latest"
   }  
 
   #Размещаем image в созданном registry
   provisioner "local-exec" {
-    command = "docker push cr.yandex/${yandex_container_registry.my_registry.id}/nginx:1.0.0"
-    working_dir = "../docker"
+    command = "docker push cr.yandex/${yandex_container_registry.my_registry.id}/nginx:v1.0.0 && docker push cr.yandex/${yandex_container_registry.my_registry.id}/nginx:latest"
   }  
-  
+}
+resource "local_file" "registry_id_file" {
+  filename = "../ansible/registry_id.txt"
+  content  = "my_registry_id: ${yandex_container_registry.my_registry.id}"
 }
 
 ```
@@ -740,7 +781,7 @@ resource "null_resource" "docker" {
   tasks:
 
     - name: Clone kube-prometheus
-      git:
+      ansible.builtin.git:
         repo: https://github.com/prometheus-operator/kube-prometheus.git
         dest: kube-prometheus
 
@@ -761,22 +802,22 @@ resource "null_resource" "docker" {
    
     - name: Copy service grafana
       ansible.builtin.copy:
-        src: '../k8s/service-grafana.yml'
+        src: '../k8s/grafana-service.yml'
         dest: '~/'
         mode: '0644'
 
     - name: Apply service grafana
       ansible.builtin.command:
-        cmd: 'kubectl apply -f ~/service-grafana.yml -n monitoring'
-    
+        cmd: 'kubectl apply -f ~/grafana-service.yml -n monitoring'
+
     - name: Copy network policy
       ansible.builtin.copy:
-        src: '../k8s/network-policy.yml'
+        src: '../k8s/grafana-networkpolicy.yml'
         dest: '~/'
     
     - name: Apply network policy for grafana
       ansible.builtin.command:
-        cmd: 'kubectl apply -f ~/network-policy.yml -n monitoring'
+        cmd: 'kubectl apply -f ~/grafana-networkpolicy.yml -n monitoring'
 
 ```
 
@@ -808,9 +849,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   labels:
-    app.kubernetes.io/component: grafana
     app.kubernetes.io/name: grafana
-    app.kubernetes.io/part-of: kube-prometheus
   name: grafana
   namespace: monitoring
 spec:
@@ -854,7 +893,7 @@ resource "yandex_lb_target_group" "nlb-group" {
   }
 }
 
-# Создаю балансировщик grafana
+# Создаю балансировщик grafana и app
 resource "yandex_lb_network_load_balancer" "nlb-grafana" {
   name = "nlb-grafana"
   listener {
@@ -865,6 +904,16 @@ resource "yandex_lb_network_load_balancer" "nlb-grafana" {
       ip_version = "ipv4"
     }
   }
+
+    listener {
+    name        = "app-listener"
+    port        = 80
+    target_port = 31080
+    external_address_spec {
+      ip_version = "ipv4"
+    }
+  }
+
   attached_target_group {
     target_group_id = yandex_lb_target_group.nlb-group.id
     healthcheck {
@@ -877,9 +926,44 @@ resource "yandex_lb_network_load_balancer" "nlb-grafana" {
   depends_on = [yandex_lb_target_group.nlb-group]
 }
 
+# Создаю группу балансировщика для kubectl
+resource "yandex_lb_target_group" "nlb-k8s" {
+  name       = "nlb-k8s"
+  target {
+    subnet_id  = yandex_compute_instance.masters.network_interface.0.subnet_id
+    address    = yandex_compute_instance.masters.network_interface.0.ip_address
+  }
+}
+  
+
+# Создаю балансировщик k8s
+resource "yandex_lb_network_load_balancer" "nlb-k8s" {
+  name = "nlb-k8s"
+  listener {
+    name        = "k8s-listener"
+    port        = 16443
+    target_port = 6443
+    external_address_spec {
+      ip_version = "ipv4"
+    }
+  }
+
+
+  attached_target_group {
+    target_group_id = yandex_lb_target_group.nlb-k8s.id
+    healthcheck {
+      name = "healthcheck-k8s"
+      tcp_options {
+        port = 6443
+      }
+    }
+  }
+  depends_on = [yandex_lb_target_group.nlb-k8s]
+}
+
 ```
 
-5. Для удобства создадим output.tf, который выведет адрес графаны:
+5. Для удобства создадим output.tf, который выведет адрес графаны, кластера K8S, приложения и id_registry:
 
 ```
 output "Grafana_address" {
@@ -889,8 +973,34 @@ output "Grafana_address" {
       for spec in listener.external_address_spec :
       "http://${spec.address}:${listener.port}"
     ][0]
+  ][1]
+}
+
+output "my_registry_id" {
+  value = yandex_container_registry.my_registry.id
+  
+}
+
+output "K8S_address" {
+  value = [
+    for listener in yandex_lb_network_load_balancer.nlb-k8s.listener :
+    [
+      for spec in listener.external_address_spec :
+      "${spec.address}:${listener.port}"
+    ][0]
   ][0]
 }
+
+output "App_address" {
+  value = [
+    for listener in yandex_lb_network_load_balancer.nlb-grafana.listener :
+    [
+      for spec in listener.external_address_spec :
+      "http://${spec.address}:${listener.port}"
+    ][0]
+  ][0]
+}
+
 
 ```
 
@@ -912,9 +1022,35 @@ output "Grafana_address" {
 
 ```
 
-7. Для разворачивания всех ресурсов, кластера k8s и мониторинга применим команду ```terraform apply```
+7. Для разворачивания приложение напишем плейбук:
 
-8. В результате:
+```
+---
+- name: Depoy app
+  hosts: kube_control_plane
+  gather_facts: true
+  become: false
+  vars_files:
+    - "registry_id.txt"
+
+  tasks:
+  - name: Change registry
+    ansible.builtin.command:
+      cmd: 'sed -i -e "s|image:.*|image: cr.yandex/{{ vars.my_registry_id }}/nginx:latest|" ~/k8s/app-deployment.yml'
+
+  - name: Deployment to k8s
+    ansible.builtin.command:
+      cmd: "kubectl apply -f {{ item }}"
+    with_items:
+      - "~/k8s/app-deployment.yml"
+      - "~/k8s/app-networkpolicy.yml"
+      - "~/k8s/app-service.yml"
+
+```
+
+8. Для разворачивания всех ресурсов, кластера k8s и мониторинга применим команду ```terraform apply```
+
+9. В результате:
 
 ![image](https://github.com/user-attachments/assets/9467dade-bd3e-4d0d-b54c-54d6521ea090)
 
@@ -944,6 +1080,253 @@ output "Grafana_address" {
 1. Интерфейс ci/cd сервиса доступен по http.
 2. При любом коммите в репозиторие с тестовым приложением происходит сборка и отправка в регистр Docker образа.
 3. При создании тега (например, v1.0.0) происходит сборка и отправка с соответствующим label в регистри, а также деплой соответствующего Docker образа в кластер Kubernetes.
+
+
+### Выполнение:
+
+1. Создадим необходимые secrets в репозитории devops-dimplom:
+
+![image](https://github.com/user-attachments/assets/11b4635b-f0bd-41c1-8513-c638d2aaa95d)
+
+2. Подготовим workflow:
+
+```
+name: Terraform CI/CD
+
+on:
+ push:
+   branches:
+     - main
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  TF_VAR_access_key: ${{ secrets.TF_VAR_access_key }}
+  TF_VAR_secret_key: ${{ secrets.TF_VAR_secret_key }}
+  TF_VAR_account_id: ${{ secrets.TF_VAR_account_id }}
+  TF_VAR_cloud_id: ${{ secrets.TF_VAR_cloud_id }}
+  TF_VAR_folder_id: ${{ secrets.TF_VAR_folder_id }}
+  TF_VAR_default_zone: ${{ secrets.TF_VAR_default_zone }}
+  ANSIBLE_SSH_PRIVATE_KEY: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }}
+  ANSIBLE_SSH_PUBLIC_KEY: ${{ secrets.ANSIBLE_SSH_PUBLIC_KEY }}
+
+jobs:
+  terraform:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Create service account key file
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SA_IAM_KEY }}" | base64 --decode > ~/.ssh/sa-iam.json
+
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ env.ANSIBLE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        echo "${{ env.ANSIBLE_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+        chmod 600 ~/.ssh/id_rsa.pub
+
+    - name: Terraform Init
+      working-directory: terraform
+      run: terraform init
+      
+    - name: Terraform Validate
+      working-directory: terraform
+      run: terraform validate
+     
+    - name: Terraform Plan
+      working-directory: terraform
+      run: terraform plan
+      
+    - name: Terraform Apply
+      working-directory: terraform
+      run: terraform apply -auto-approve
+
+    - name: Get terraform output in yml
+      working-directory: terraform
+      run: |
+        terraform output -json > ../k8s/tf_outputs.json
+        jq -r 'to_entries | map(.key + ": " + .value.value) | .[]' ../k8s/tf_outputs.json > ../k8s/tf_outputs.yml
+
+    - name: Install GitHub CLI
+      run: |
+        sudo apt-get install gh
+
+    - name: Login to GitHub
+      env:
+        PAT: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      run: |
+        echo "$PAT" | gh auth login --with-token
+
+    - name: Set secret in another repository
+      run: |
+        my_registry_id=$(grep 'my_registry_id:'  k8s/tf_outputs.yml | cut -d ' ' -f 2)
+        echo $my_registry_id
+        gh secret set MY_REGISTRY_ID --body $my_registry_id --repo LexionN/devops-diplom-app
+        K8S_address=$(grep 'K8S_address:'  k8s/tf_outputs.yml | cut -d ' ' -f 2)
+        sed -i "s/127.0.0.1:6443/$K8S_address/g" k8s/kube-config
+        kube_config=$(base64 < k8s/kube-config | tr -d '\n' | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+        gh secret set KUBE_CONFIG --body $kube_config --repo LexionN/devops-diplom-app
+```
+
+4. Проверим работу pipeline:
+
+![image](https://github.com/user-attachments/assets/01be19e0-89c7-4953-99bb-2e4a88789500)
+
+5. Создадим необходимые secrets в репозитории devops-diplom-app:
+
+![image](https://github.com/user-attachments/assets/2a267cd0-b16b-41c1-a88d-94f30c852df7)
+
+6. Созадим pipeline:
+
+```
+name: Docker Image CI
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  MY_REGISTRY_ID: ${{ secrets.MY_REGISTRY_ID }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build and push Docker image with tag
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: true
+        tags: |
+          cr.yandex/${{ env.MY_REGISTRY_ID }}/nginx:${{ github.ref_name }}
+          cr.yandex/${{ env.MY_REGISTRY_ID }}/nginx:latest
+    
+    - name: Update Deployment YAML
+      run: |
+        sed -i "s/repository-id/${{ env.MY_REGISTRY_ID }}/g" ./k8s/app-deployment.yml
+        sed -i "s/\:latest/\:${{ github.ref_name }}/g" ./k8s/app-deployment.yml
+
+    - name: Setup Kubernetes
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'latest' 
+
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > config
+        chmod 600 config
+
+
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl --kubeconfig=config --insecure-skip-tls-verify apply -f ./k8s/app-deployment.yml
+        kubectl --kubeconfig=config --insecure-skip-tls-verify apply -f ./k8s/app-service.yml
+        kubectl --kubeconfig=config --insecure-skip-tls-verify apply -f ./k8s/app-networkpolicy.yml
+```
+
+7. Проверим работу:
+
+```
+name: Docker Image CI
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  MY_REGISTRY_ID: ${{ secrets.MY_REGISTRY_ID }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build and push Docker image with tag
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: true
+        tags: |
+          cr.yandex/${{ env.MY_REGISTRY_ID }}/nginx:${{ github.ref_name }}
+          cr.yandex/${{ env.MY_REGISTRY_ID }}/nginx:latest
+    
+    - name: Update Deployment YAML
+      run: |
+        sed -i "s/repository-id/${{ env.MY_REGISTRY_ID }}/g" ./k8s/app-deployment.yml
+        sed -i "s/\:latest/\:${{ github.ref_name }}/g" ./k8s/app-deployment.yml
+
+    - name: Setup Kubernetes
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'latest' 
+
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > config
+        chmod 600 config
+
+
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl --kubeconfig=config --insecure-skip-tls-verify apply -f ./k8s/app-deployment.yml
+        kubectl --kubeconfig=config --insecure-skip-tls-verify apply -f ./k8s/app-service.yml
+        kubectl --kubeconfig=config --insecure-skip-tls-verify apply -f ./k8s/app-networkpolicy.yml
+```
+
+---
+
+## Ссылки на созданные конфигурационные файлы:
+## Репозиторий devops-diplom
+[terraform-prepare](https://github.com/LexionN/devops-diplom/tree/main/terraform)
+
+[terraform](https://github.com/LexionN/devops-diplom/tree/main/terraform)
+
+[ansible](https://github.com/LexionN/devops-diplom/tree/main/ansible)
+
+[docker](https://github.com/LexionN/devops-diplom/tree/main/docker)
+
+[k8s](https://github.com/LexionN/devops-diplom/tree/main/k8s)
+
+[pipeline](https://github.com/LexionN/devops-diplom/blob/main/.github/workflows/terraform.yml)
+
+
+## Репозиторий devops-diplom-app
+
+[Dockerfile](https://github.com/LexionN/devops-diplom-app/blob/main/Dockerfile)
+
+[index.html](https://github.com/LexionN/devops-diplom-app/blob/main/index.html)
+
+[k8s](https://github.com/LexionN/devops-diplom-app/tree/main/k8s)
+
+[pipeline](https://github.com/LexionN/devops-diplom-app/blob/main/.github/workflows/build-pull-deploy.yml)
+
+
+---
+
+В результате выполненной работы при любом коммите в ветку main репозитория devops-diplom происходит разворачивание ресурсов:
+
+1. Инфраструктуры в yandex cloud
+2. Кластера kubernetes
+3. Мониторинга
+4. Создается и деплоится приложение в registry yandex cloud
+5. Поднимается приложение в кластере kubernetes
+6. Передаются данные в secrets репозитория devops-diplom-app
+
+В репозитории devops-diplom-app, при создании тега происходит сборка и отправка с tag в регистри приложения, а также деплой соответствующего приложения в кластер Kubernetes.
+
+
+
+
 
 ---
 ## Что необходимо для сдачи задания?
