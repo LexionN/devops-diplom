@@ -53,4 +53,4 @@
       ansible.builtin.fetch:
         src: "{{ home_dir }}/.kube/config"
         dest: ../k8s/kube-config
-      flat: yes
+        flat: yes
