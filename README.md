@@ -1288,18 +1288,41 @@ jobs:
 ## Ссылки на созданные конфигурационные файлы:
 ## Репозиторий devops-diplom
 [terraform-prepare](https://github.com/LexionN/devops-diplom/tree/main/terraform)
+
 [terraform](https://github.com/LexionN/devops-diplom/tree/main/terraform)
+
 [ansible](https://github.com/LexionN/devops-diplom/tree/main/ansible)
+
 [docker](https://github.com/LexionN/devops-diplom/tree/main/docker)
+
 [k8s](https://github.com/LexionN/devops-diplom/tree/main/k8s)
+
 [pipeline](https://github.com/LexionN/devops-diplom/blob/main/.github/workflows/terraform.yml)
+
 
 ## Репозиторий devops-diplom-app
 
 [Dockerfile](https://github.com/LexionN/devops-diplom-app/blob/main/Dockerfile)
+
 [index.html](https://github.com/LexionN/devops-diplom-app/blob/main/index.html)
+
 [k8s](https://github.com/LexionN/devops-diplom-app/tree/main/k8s)
+
 [pipeline](https://github.com/LexionN/devops-diplom-app/blob/main/.github/workflows/build-pull-deploy.yml)
+
+
+---
+
+В результате выполненной работы при любом коммите в ветку main репозитория devops-diplom происходит разворачивание ресурсов:
+
+1. Инфраструктуры в yandex cloud
+2. Кластера kubernetes
+3. Мониторинга
+4. Создается и деплоится приложение в registry yandex cloud
+5. Поднимается приложение в кластере kubernetes
+6. Передаются данные в secrets репозитория devops-diplom-app
+
+В репозитории devops-diplom-app, при создании тега происходит сборка и отправка с tag в регистри приложения, а также деплой соответствующего приложения в кластер Kubernetes.
 
 
 
