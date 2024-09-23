@@ -1322,7 +1322,13 @@ jobs:
 5. Поднимается приложение в кластере kubernetes
 6. Передаются данные в secrets репозитория devops-diplom-app
 
+![image](https://github.com/user-attachments/assets/6969a0c5-e781-4798-a507-3cf37a3ab70e)
+
+
 В репозитории devops-diplom-app, при создании тега происходит сборка и отправка с tag в регистри приложения, а также деплой соответствующего приложения в кластер Kubernetes.
+
+![image](https://github.com/user-attachments/assets/3fe46ed5-3f81-4489-a76e-21529f3dc7df)
+
 
 Изначально выглядит вот так:
 
